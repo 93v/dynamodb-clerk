@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 (async () => {
   // Clean the console
   // tslint:disable-next-line: no-console
