@@ -1,0 +1,20 @@
+{
+  "name": "dynamodb-clerk",
+  "version": "1.0.0",
+  "description": "Backup and Restore DynamoDB Tables",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/93v/dynamodb-clerk.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/93v/dynamodb-clerk/issues"
+  },
+  "homepage": "https://github.com/93v/dynamodb-clerk#readme"
+}
