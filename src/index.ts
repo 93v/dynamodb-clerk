@@ -1,19 +1,38 @@
 #!/usr/bin/env node
 
+import yargs from "yargs";
+import { configureAction } from "./actions";
+import { ActionOptions } from "./constants";
+import { configureDB } from "./dynamodb";
+import { initProcess } from "./process";
+import Store from "./store";
+
 (async () => {
-  // Clean the console
-  // tslint:disable-next-line: no-console
   console.clear();
 
-  // Reset the store
+  Store.reset();
 
-  // Read the CLI args
+  const argv = yargs.argv;
 
-  // Store the CLI args in the store
+  Store.set("argv", argv);
 
-  // Select the action
+  await configureAction();
 
-  // Configure based on action
+  const action = Store.get<ActionOptions>("action");
 
-  // Launch the action
+  if (action == null) {
+    return;
+  }
+
+  await configureDB(
+    action === ActionOptions["Backup From Local"] ||
+      action === ActionOptions["Restore To Local"],
+  );
+
+  await initProcess(
+    action === ActionOptions["Restore To Local"] ||
+      action === ActionOptions["Restore To Remote"]
+      ? "restore"
+      : "backup",
+  );
 })();

@@ -1,8 +1,8 @@
 import { Options } from "async-retry";
 
 export enum ActionOptions {
-  "Backup from remote" = "backup-from-remote",
-  "Backup from local" = "backup-from-local",
+  "Backup From Remote" = "backup-from-remote",
+  "Backup From Local" = "backup-from-local",
   "Restore To Local" = "restore-to-local",
   "Restore To Remote" = "restore-to-remote",
 }

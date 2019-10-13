@@ -1,3 +1,7 @@
+import { spawn } from "child_process";
+import { lstatSync, readdirSync } from "fs";
+import { join } from "path";
+
 export const isRetryableDBError = (ex: any) =>
   ["ProvisionedThroughputExceededException", "ThrottlingException"].includes(
     ex.code,
@@ -75,4 +79,73 @@ export const intersection = <T>(a: T[], b: T[]) => {
 
 export const assertNever = (obj: never): never => {
   throw new Error("Unexpected value: " + obj);
+};
+
+export const readSizeRecursive = (item: string): number => {
+  const stats = lstatSync(item);
+
+  if (stats.isDirectory()) {
+    let totalSize = stats.size || 0;
+
+    const list = readdirSync(item);
+
+    list.forEach((dir) => {
+      const dirSize = readSizeRecursive(join(item, dir));
+
+      totalSize += dirSize || 0;
+    });
+
+    return totalSize;
+  } else {
+    return stats.size || 0;
+  }
+};
+
+export const asyncSpawn = (
+  command: string,
+  args?: ReadonlyArray<string>,
+): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(command, args);
+
+    const stdOuts: string[] = [];
+    const stdErrs: any[] = [];
+
+    child.stdout.on("data", (data) => {
+      stdOuts.push(data);
+    });
+
+    child.stderr.on("data", (err) => {
+      stdErrs.push(err);
+    });
+
+    child.on("exit", () => {
+      if (stdErrs.length > 0) {
+        return reject(stdErrs.join().toString());
+      }
+
+      resolve(stdOuts.join());
+    });
+
+    child.on("error", (error) => {
+      reject(error);
+    });
+  });
+
+export const parseProcess = <T>(d: any, titles: string[] = []) => {
+  const obj = {};
+
+  let propIndex = 0;
+  d.forEach((val: T, index: number) => {
+    let prop = titles[index];
+
+    if (prop == null) {
+      propIndex++;
+      prop = `arg${propIndex}`;
+    }
+
+    obj[prop.toLowerCase()] = val;
+  });
+
+  return obj as T;
 };
