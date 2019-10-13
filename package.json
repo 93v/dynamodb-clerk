@@ -13,6 +13,9 @@
     "start": "NODE_OPTIONS='--max-old-space-size=8192' ts-node ./src/index.ts",
     "semantic-release": "semantic-release"
   },
+  "bin": {
+    "dynamodb-clerk": "npm start"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/93v/dynamodb-clerk.git"
