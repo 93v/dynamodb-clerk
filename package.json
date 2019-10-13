@@ -14,7 +14,7 @@
     "semantic-release": "semantic-release"
   },
   "bin": {
-    "dynamodb-clerk": "npm start"
+    "dynamodb-clerk": "node ./dist/index.js"
   },
   "repository": {
     "type": "git",
