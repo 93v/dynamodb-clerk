@@ -1,20 +1,64 @@
 {
   "name": "dynamodb-clerk",
-  "version": "1.0.0",
+  "version": "0.0.0-development",
   "description": "Backup and Restore DynamoDB Tables",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "tslint -p tsconfig.json",
+    "test": "jest",
+    "test:watch": "jest --watchAll",
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "npm link && nodemon",
+    "semantic-release": "semantic-release"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/93v/dynamodb-clerk.git"
+    "url": "https://github.com/93v/dynamodb-clerk.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "DynamoDB",
+    "DynamoDB Clerk",
+    "Backup",
+    "Restore"
+  ],
+  "author": {
+    "name": "93v",
+    "email": "93v@protonmail.com"
+  },
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/93v/dynamodb-clerk/issues"
   },
-  "homepage": "https://github.com/93v/dynamodb-clerk#readme"
+  "homepage": "https://github.com/93v/dynamodb-clerk#readme",
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run lint && npm test",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS",
+      "pre-push": "npm run lint && npm test"
+    }
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^8.2.0",
+    "@commitlint/config-conventional": "^8.2.0",
+    "@types/jest": "^24.0.18",
+    "@types/node": "^12.7.12",
+    "eslint": "^6.5.1",
+    "eslint-config-prettier": "^6.4.0",
+    "eslint-plugin-prettier": "^3.1.1",
+    "husky": "^3.0.9",
+    "jest": "^24.9.0",
+    "nodemon": "^1.19.3",
+    "prettier": "^1.18.2",
+    "semantic-release": "^15.13.24",
+    "ts-jest": "^24.1.0",
+    "tslint": "^5.20.0",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint-plugin-prettier": "^2.0.1",
+    "typescript": "^3.6.4"
+  },
+  "files": [
+    "dist/**/*"
+  ]
 }
