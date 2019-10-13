@@ -1,1 +1,4 @@
-export const greet = (name: string) => `Hello ${name}`;
+(async () => {
+  // tslint:disable-next-line: no-console
+  console.clear();
+})();
