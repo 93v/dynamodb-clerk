@@ -249,14 +249,36 @@ export const startRestoreProcess = async () => {
     );
   });
 
-  const { archive } = await prompt([
-    {
-      choices: files.map((file) => basename(file)),
-      message: "Select the archive",
-      name: "archive",
-      type: "list",
-    },
-  ]);
+  const argv =
+    Store.get<Record<string, string | null | undefined>>("argv") || {};
+
+  const archiveFromArgs = argv.archive;
+
+  let archive: string | null = null;
+
+  if (archiveFromArgs != null) {
+    if (
+      files.map((file) => basename(file)).find((f) => f === archiveFromArgs)
+    ) {
+      archive = archiveFromArgs;
+    } else {
+      console.log(
+        "\nArchive does not exist or is invalid. Please select one!\n",
+      );
+    }
+  }
+
+  if (archive == null) {
+    const response: { archive: string } = await prompt([
+      {
+        choices: files.map((file) => basename(file)),
+        message: "Select the archive",
+        name: "archive",
+        type: "list",
+      },
+    ]);
+    archive = response.archive;
+  }
 
   const spinner = ora("Decompressing the archive").start();
 
@@ -274,7 +296,7 @@ export const startRestoreProcess = async () => {
     const filesInArchive = await new Promise((resolve) => {
       tar.t({
         C: BACKUP_PATH_PREFIX,
-        file: join(BACKUP_PATH_PREFIX, archive),
+        file: join(BACKUP_PATH_PREFIX, archive!),
         noResume: true,
         onentry: (entry) => {
           resolve(entry);
@@ -302,72 +324,96 @@ export const startRestoreProcess = async () => {
     const dbTablesCommonPrefix = findCommon(tablesInDB);
     const dbTablesCommonSuffix = findCommon(tablesInDB, "suffix");
 
-    let defaultArchiveTablesSearchPattern = "";
+    const archiveTablesSearchPatternFromArgs =
+      argv["archive-tables-search-pattern"];
 
-    if (archiveTablesCommonPrefix != null) {
-      defaultArchiveTablesSearchPattern += `^${archiveTablesCommonPrefix}`;
+    let archiveTablesSearchPattern: string | null = null;
+
+    if (archiveTablesSearchPatternFromArgs != null) {
+      archiveTablesSearchPattern = archiveTablesSearchPatternFromArgs;
     }
 
-    defaultArchiveTablesSearchPattern += `(.+)`;
+    if (archiveTablesSearchPattern == null) {
+      let defaultArchiveTablesSearchPattern = "";
 
-    if (archiveTablesCommonSuffix != null) {
-      defaultArchiveTablesSearchPattern += `${archiveTablesCommonSuffix}$`;
-    }
-
-    if (
-      archiveTablesCommonPrefix != null &&
-      archiveTablesCommonPrefix === archiveTablesCommonSuffix
-    ) {
-      defaultArchiveTablesSearchPattern = archiveTablesCommonPrefix;
-      archiveHasPattern = false;
-    }
-
-    const { archiveTablesSearchPattern } = await prompt([
-      {
-        default:
-          defaultArchiveTablesSearchPattern !== ""
-            ? `${defaultArchiveTablesSearchPattern}`
-            : null,
-        message: "Enter the archive table names search pattern (string, regex)",
-        name: "archiveTablesSearchPattern",
-        type: "input",
-      },
-    ]);
-
-    let defaultDBTablesReplacePattern = "";
-
-    if (dbTablesCommonPrefix != null) {
-      defaultDBTablesReplacePattern += `${dbTablesCommonPrefix}`;
-    }
-
-    defaultDBTablesReplacePattern += `$1`;
-
-    if (dbTablesCommonSuffix != null) {
-      defaultDBTablesReplacePattern += `${dbTablesCommonSuffix}$`;
-    }
-
-    if (
-      dbTablesCommonPrefix != null &&
-      dbTablesCommonPrefix === dbTablesCommonSuffix
-    ) {
-      defaultDBTablesReplacePattern = dbTablesCommonPrefix;
-
-      if (archiveHasPattern) {
-        defaultDBTablesReplacePattern += `$1`;
+      if (archiveTablesCommonPrefix != null) {
+        defaultArchiveTablesSearchPattern += `^${archiveTablesCommonPrefix}`;
       }
+
+      defaultArchiveTablesSearchPattern += `(.+)`;
+
+      if (archiveTablesCommonSuffix != null) {
+        defaultArchiveTablesSearchPattern += `${archiveTablesCommonSuffix}$`;
+      }
+
+      if (
+        archiveTablesCommonPrefix != null &&
+        archiveTablesCommonPrefix === archiveTablesCommonSuffix
+      ) {
+        defaultArchiveTablesSearchPattern = archiveTablesCommonPrefix;
+        archiveHasPattern = false;
+      }
+
+      const response: { archiveTablesSearchPattern: string } = await prompt([
+        {
+          default:
+            defaultArchiveTablesSearchPattern !== ""
+              ? `${defaultArchiveTablesSearchPattern}`
+              : null,
+          message:
+            "Enter the archive table names search pattern (string, regex)",
+          name: "archiveTablesSearchPattern",
+          type: "input",
+        },
+      ]);
+      archiveTablesSearchPattern = response.archiveTablesSearchPattern;
     }
 
-    const { dbTablesReplacePattern } = await prompt([
-      {
-        default: defaultDBTablesReplacePattern
-          ? defaultDBTablesReplacePattern
-          : null,
-        message:
-          "Enter the DynamoDB Local table names replace pattern (string, regex)",
-        name: "dbTablesReplacePattern",
-        type: "input",
-      },
-    ]);
+    const dbTablesReplacePatternFromArgs = argv["db-tables-replace-pattern"];
+
+    let dbTablesReplacePattern: string | null = null;
+
+    if (dbTablesReplacePatternFromArgs != null) {
+      dbTablesReplacePattern = dbTablesReplacePatternFromArgs;
+    }
+
+    if (dbTablesReplacePattern == null) {
+      let defaultDBTablesReplacePattern = "";
+
+      if (dbTablesCommonPrefix != null) {
+        defaultDBTablesReplacePattern += `${dbTablesCommonPrefix}`;
+      }
+
+      defaultDBTablesReplacePattern += `$1`;
+
+      if (dbTablesCommonSuffix != null) {
+        defaultDBTablesReplacePattern += `${dbTablesCommonSuffix}$`;
+      }
+
+      if (
+        dbTablesCommonPrefix != null &&
+        dbTablesCommonPrefix === dbTablesCommonSuffix
+      ) {
+        defaultDBTablesReplacePattern = dbTablesCommonPrefix;
+
+        if (archiveHasPattern) {
+          defaultDBTablesReplacePattern += `$1`;
+        }
+      }
+
+      const response: { dbTablesReplacePattern: string } = await prompt([
+        {
+          default: defaultDBTablesReplacePattern
+            ? defaultDBTablesReplacePattern
+            : null,
+          message:
+            "Enter the DynamoDB table names replace pattern (string, regex)",
+          name: "dbTablesReplacePattern",
+          type: "input",
+        },
+      ]);
+      dbTablesReplacePattern = response.dbTablesReplacePattern;
+    }
 
     const tableNamesConversionMapping = {};
 

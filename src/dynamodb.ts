@@ -137,25 +137,47 @@ const configureForLocal = async () => {
 
   Store.set("port", port);
 
-  const { accessKeyId } = await prompt([
-    {
-      default: "localAwsAccessKeyId",
-      message: "Enter the Access Key Id",
-      name: "accessKeyId",
-      type: "input",
-    },
-  ]);
+  const accessKeyIdFromArgs = argv["access-key-id"];
+
+  let accessKeyId: string | null = null;
+
+  if (accessKeyIdFromArgs != null) {
+    accessKeyId = accessKeyIdFromArgs;
+  }
+
+  if (accessKeyId == null) {
+    const response: { accessKeyId: string } = await prompt([
+      {
+        default: "localAwsAccessKeyId",
+        message: "Enter the Access Key Id",
+        name: "accessKeyId",
+        type: "input",
+      },
+    ]);
+    accessKeyId = response.accessKeyId;
+  }
 
   Store.set("accessKeyId", accessKeyId);
 
-  const { secretAccessKey } = await prompt([
-    {
-      default: "localAwsSecretAccessKey",
-      message: "Enter the Secret Access Key",
-      name: "secretAccessKey",
-      type: "input",
-    },
-  ]);
+  const secretAccessKeyFromArgs = argv["secret-access-key"];
+
+  let secretAccessKey: string | null = null;
+
+  if (secretAccessKeyFromArgs != null) {
+    secretAccessKey = secretAccessKeyFromArgs;
+  }
+
+  if (secretAccessKey == null) {
+    const response: { secretAccessKey: string } = await prompt([
+      {
+        default: "localAwsSecretAccessKey",
+        message: "Enter the Secret Access Key",
+        name: "secretAccessKey",
+        type: "input",
+      },
+    ]);
+    secretAccessKey = response.secretAccessKey;
+  }
 
   Store.set("secretAccessKey", secretAccessKey);
 
