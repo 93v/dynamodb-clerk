@@ -54,7 +54,7 @@ const getDynamoDBLocalProcesses = async () => {
 
   return parsedData
     .map((d) => parseProcess<IPSProcess>(d, titles))
-    .flat(0)
+    .reduce((acc, val) => acc.concat(val), [] as IPSProcess[])
     .filter(
       (d) =>
         oc(d)
@@ -73,7 +73,7 @@ const getJavaProcessesListeningToTCPPorts = async () => {
 
   return parsedData
     .map((d) => parseProcess<ILSOFProcess>(d, titles))
-    .flat(0)
+    .reduce((acc, val) => acc.concat(val), [] as ILSOFProcess[])
     .filter((d) =>
       oc(d)
         .command("")
