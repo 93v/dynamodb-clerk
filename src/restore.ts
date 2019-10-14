@@ -25,9 +25,7 @@ import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "./constants";
 import Store from "./store";
 import { findCommon, isRetryableDBError, millisecondsToStr } from "./utils";
 
-const BATCH_OPTIONS = {
-  writeLimit: 25, // Dynamodb batchWrite limit
-};
+const BATCH_OPTIONS = { writeLimit: 25 };
 
 const restoreTable = async (
   tableName: string,
@@ -268,23 +266,23 @@ export const startRestoreProcess = async () => {
       throw new Error("Database config not found");
     }
 
-    const [filesInArchive, dbTables] = await Promise.all([
-      new Promise((resolve) => {
-        tar.t({
-          C: BACKUP_PATH_PREFIX,
-          file: join(BACKUP_PATH_PREFIX, archive),
-          noResume: true,
-          onentry: (entry) => {
-            resolve(entry);
-          },
-        });
-      }),
-      db.listTables().promise(),
-      tar.x({
+    await tar.x({
+      C: BACKUP_PATH_PREFIX,
+      file: join(BACKUP_PATH_PREFIX, archive),
+    });
+
+    const filesInArchive = await new Promise((resolve) => {
+      tar.t({
         C: BACKUP_PATH_PREFIX,
         file: join(BACKUP_PATH_PREFIX, archive),
-      }),
-    ]);
+        noResume: true,
+        onentry: (entry) => {
+          resolve(entry);
+        },
+      });
+    });
+
+    const dbTables = await db.listTables().promise();
 
     const extractionFolder: string = oc(filesInArchive as any)
       .path("")
@@ -299,8 +297,9 @@ export const startRestoreProcess = async () => {
     const tablesInDB = oc(dbTables).TableNames([]);
 
     const archiveTablesCommonPrefix = findCommon(tablesInArchive);
-    const dbTablesCommonPrefix = findCommon(tablesInDB);
     const archiveTablesCommonSuffix = findCommon(tablesInArchive, "suffix");
+    let archiveHasPattern = true;
+    const dbTablesCommonPrefix = findCommon(tablesInDB);
     const dbTablesCommonSuffix = findCommon(tablesInDB, "suffix");
 
     let defaultArchiveTablesSearchPattern = "";
@@ -313,6 +312,14 @@ export const startRestoreProcess = async () => {
 
     if (archiveTablesCommonSuffix != null) {
       defaultArchiveTablesSearchPattern += `${archiveTablesCommonSuffix}$`;
+    }
+
+    if (
+      archiveTablesCommonPrefix != null &&
+      archiveTablesCommonPrefix === archiveTablesCommonSuffix
+    ) {
+      defaultArchiveTablesSearchPattern = archiveTablesCommonPrefix;
+      archiveHasPattern = false;
     }
 
     const { archiveTablesSearchPattern } = await prompt([
@@ -337,6 +344,17 @@ export const startRestoreProcess = async () => {
 
     if (dbTablesCommonSuffix != null) {
       defaultDBTablesReplacePattern += `${dbTablesCommonSuffix}$`;
+    }
+
+    if (
+      dbTablesCommonPrefix != null &&
+      dbTablesCommonPrefix === dbTablesCommonSuffix
+    ) {
+      defaultDBTablesReplacePattern = dbTablesCommonPrefix;
+
+      if (archiveHasPattern) {
+        defaultDBTablesReplacePattern += `$1`;
+      }
     }
 
     const { dbTablesReplacePattern } = await prompt([
