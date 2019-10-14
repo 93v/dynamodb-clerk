@@ -15,5 +15,5 @@ Backup and Restore DynamoDB Tables
 --profile                         # Profile name from AWS local credentials
 --region                          # AWS region
 --secret-access-key               # AWS Secret Access Key
---tables                          # List of tables to backup
+--tables                          # Use "*" to skip the list and archive all tables
 ```
