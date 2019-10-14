@@ -50,7 +50,7 @@ export const findCommon = (
 
   for (
     let i = type === "prefix" ? 0 : firstElement.length;
-    type === "prefix" ? i < firstElement.length : i > 0;
+    type === "prefix" ? i <= firstElement.length : i >= 0;
     type === "prefix" ? i++ : i--
   ) {
     const toTest =

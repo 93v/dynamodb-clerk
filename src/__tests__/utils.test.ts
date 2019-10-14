@@ -57,6 +57,8 @@ describe("Utils", () => {
 describe("Find Common substrings in an array of strings", () => {
   test(findCommon, () => {
     given([], "prefix").expect(null);
+    given(["communication"]).expect("communication");
+    given(["communication"], "suffix").expect("communication");
     given(["communication", "command"]).expect("comm");
     given(["communication", "command"], "prefix").expect("comm");
     given(["communication", "command", "south"], "prefix").expect(null);
