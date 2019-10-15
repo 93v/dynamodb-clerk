@@ -2,6 +2,8 @@ import { DynamoDB } from "aws-sdk";
 import { ServiceConfigurationOptions } from "aws-sdk/lib/service";
 import { Agent } from "https";
 import { prompt } from "inquirer";
+import { argv } from "yargs";
+import { DBCActionEnv } from "../types/action";
 import { AWS_REGIONS } from "./constants";
 import { getProfileProperty, listAvailableProfiles } from "./profiles";
 import Store from "./store";
@@ -13,200 +15,205 @@ const sslAgent = new Agent({
   rejectUnauthorized: true,
 });
 
-const configureForLocal = async () => {
-  const argv =
-    Store.get<Record<string, string | null | undefined>>("argv") || {};
+export const configureDB = async () => {
+  const env = Store.get<DBCActionEnv>("env");
 
-  const portFromArgs = argv.port;
+  if (env === "local") {
+    const portFromArgs = argv.port as string | null;
 
-  let port: string | null = null;
+    let port: string | null = null;
 
-  const availablePorts = await getLocalDynamoDBPorts();
+    const availablePorts = await getLocalDynamoDBPorts();
 
-  if (portFromArgs != null) {
-    if (availablePorts.includes(portFromArgs.toString())) {
-      port = portFromArgs.toString();
-    } else {
-      console.log("\nThe port is not open. Please select one!\n");
+    if (portFromArgs != null) {
+      if (availablePorts.includes(portFromArgs.toString())) {
+        port = portFromArgs.toString();
+      } else {
+        console.log("\nThe port is not open. Please select one!\n");
+      }
+    }
+
+    if (availablePorts.length === 0) {
+      console.log("\nLooks like there are no DynamoDB instances running.");
+      console.log(
+        "\nPlease launch the DynamoDB locally and restart this process.\n",
+      );
+      process.exit(0);
+    }
+
+    if (port == null) {
+      const response: {
+        port: string;
+      } = await prompt([
+        {
+          choices: availablePorts,
+          message: "Select the port of DynamoDB Local?",
+          name: "port",
+          type: "list",
+        },
+      ]);
+      port = response.port;
+    }
+
+    Store.set("port", port);
+  }
+
+  const accessKeyIdFromArgs = argv["access-key-id"];
+  const secretAccessKeyFromArgs = argv["secret-access-key"];
+  const regionFromArgs = argv.region;
+
+  if (
+    accessKeyIdFromArgs == null ||
+    secretAccessKeyFromArgs == null ||
+    (regionFromArgs == null && env !== "local")
+  ) {
+    const awsProfiles = listAvailableProfiles() || [];
+
+    const profileFromArgs = argv.profile as string | null;
+
+    let profile: string | null = null;
+
+    if (profileFromArgs != null) {
+      if (awsProfiles.find((p) => p.profile === profileFromArgs && p.valid)) {
+        profile = profileFromArgs;
+      } else {
+        console.log(
+          "\nProfile does not exist or is invalid. Please select one!\n",
+        );
+      }
+    }
+
+    if (profile == null) {
+      const response: {
+        profile: string;
+      } = await prompt([
+        {
+          choices: [
+            {
+              name: "-- Enter the configs manually --",
+              value: null,
+            },
+            ...awsProfiles.map((p) => ({
+              disabled: !p.valid,
+              value: p.profile,
+            })),
+          ],
+          message: "Choose the profile",
+          name: "profile",
+          type: "list",
+        },
+      ]);
+      profile = response.profile;
+    }
+
+    Store.set("profile", profile);
+
+    if (profile != null) {
+      const profileAccessKeyId = getProfileProperty(profile, "access_key_id");
+      const profileSecretAccessKey = getProfileProperty(
+        profile,
+        "secret_access_key",
+      );
+      const profileRegion = getProfileProperty(profile, "region");
+
+      Store.set("accessKeyId", profileAccessKeyId);
+      Store.set("secretAccessKey", profileSecretAccessKey);
+      Store.set("region", profileRegion);
     }
   }
 
-  if (availablePorts.length === 0) {
-    console.log("\nLooks like there are no DynamoDB instances running.");
-    console.log(
-      "\nPlease launch the DynamoDB locally and restart this process.\n",
-    );
-    process.exit(0);
-  }
-
-  if (port == null) {
-    const response: { port: string } = await prompt([
-      {
-        choices: availablePorts,
-        message: "Select the port of DynamoDB Local?",
-        name: "port",
-        type: "list",
-      },
-    ]);
-    port = response.port;
-  }
-
-  Store.set("port", port);
-
-  const accessKeyIdFromArgs = argv["access-key-id"];
-
-  let accessKeyId: string | null = null;
-
   if (accessKeyIdFromArgs != null) {
-    accessKeyId = accessKeyIdFromArgs;
+    Store.set("accessKeyId", accessKeyIdFromArgs);
   }
 
-  if (accessKeyId == null) {
-    const response: { accessKeyId: string } = await prompt([
+  if (Store.get("accessKeyId") == null) {
+    const response: {
+      accessKeyId: string;
+    } = await prompt([
       {
-        default: "localAwsAccessKeyId",
+        default:
+          Store.get<DBCActionEnv>("env") === "local"
+            ? "localAwsAccessKeyId"
+            : undefined,
         message: "Enter the Access Key Id",
         name: "accessKeyId",
         type: "input",
+        validate: (v) => !!v,
       },
     ]);
-    accessKeyId = response.accessKeyId;
+    Store.set("accessKeyId", response.accessKeyId);
   }
-
-  Store.set("accessKeyId", accessKeyId);
-
-  const secretAccessKeyFromArgs = argv["secret-access-key"];
-
-  let secretAccessKey: string | null = null;
 
   if (secretAccessKeyFromArgs != null) {
-    secretAccessKey = secretAccessKeyFromArgs;
+    Store.set("secretAccessKey", secretAccessKeyFromArgs);
   }
 
-  if (secretAccessKey == null) {
-    const response: { secretAccessKey: string } = await prompt([
+  if (Store.get("secretAccessKey") == null) {
+    const response: {
+      secretAccessKey: string;
+    } = await prompt([
       {
-        default: "localAwsSecretAccessKey",
+        default:
+          Store.get<DBCActionEnv>("env") === "local"
+            ? "localAwsSecretAccessKey"
+            : undefined,
         message: "Enter the Secret Access Key",
         name: "secretAccessKey",
         type: "input",
+        validate: (v) => !!v,
       },
     ]);
-    secretAccessKey = response.secretAccessKey;
+    Store.set("secretAccessKey", response.secretAccessKey);
   }
 
-  Store.set("secretAccessKey", secretAccessKey);
-
-  const options: ServiceConfigurationOptions = {
-    accessKeyId: Store.get<string>("accessKeyId") || "localAwsAccessKeyId",
-    endpoint: `http://localhost:${port}`,
-    region: "localhost",
-    secretAccessKey:
-      Store.get<string>("secretAccessKey") || "localAwsSecretAccessKey",
-  };
-
-  Store.set("db", new DynamoDB(options));
-};
-
-const configureForRemote = async () => {
-  const awsProfiles = listAvailableProfiles();
-
-  const argv =
-    Store.get<Record<string, string | null | undefined>>("argv") || {};
-
-  const profileFromArgs = argv.profile;
-
-  let profile: string | null = null;
-
-  if (profileFromArgs != null) {
-    if (awsProfiles.find((p) => p.profile === profileFromArgs && p.valid)) {
-      profile = profileFromArgs;
-    } else {
-      console.log(
-        "\nProfile does not exist or is invalid. Please select one!\n",
-      );
+  if (env !== "local") {
+    if (
+      regionFromArgs != null &&
+      AWS_REGIONS.find((r) => r.value === regionFromArgs) != null
+    ) {
+      Store.set("region", regionFromArgs);
     }
-  }
 
-  if (profile == null) {
-    const response: {
-      profile: string;
-    } = await prompt([
-      {
-        choices: awsProfiles.map((p) => ({
-          disabled: !p.valid,
-          value: p.profile,
-        })),
-        message: "Choose the profile",
-        name: "profile",
-        type: "list",
-      },
-    ]);
-    profile = response.profile;
-  }
-
-  Store.set("profile", profile);
-
-  const awsAccessKeyId = getProfileProperty(profile, "access_key_id");
-  const awsSecretAccessKey = getProfileProperty(profile, "secret_access_key");
-
-  let region: string | null = null;
-
-  let useProfileRegion = true;
-
-  const regionFromArgs = argv.region;
-
-  if (regionFromArgs != null) {
-    if (AWS_REGIONS.find((r) => r.value === regionFromArgs) != null) {
-      region = regionFromArgs;
-    } else {
+    if (Store.get("region") == null) {
       const response: {
-        useProfileRegion: boolean;
+        region: string;
       } = await prompt([
         {
-          default: true,
-          message: `Region is invalid. Selected profile may have a region setting. Do you want to try to use that?`,
-          name: "useProfileRegion",
-          type: "confirm",
+          choices: AWS_REGIONS,
+          message: "Choose the region",
+          name: "region",
+          type: "list",
         },
       ]);
-
-      useProfileRegion = response.useProfileRegion;
+      Store.set("region", response.region);
     }
   }
 
-  if (region == null && useProfileRegion) {
-    region = getProfileProperty(profile, "region");
+  if (env === "local") {
+    Store.set("region", "localhost");
   }
 
-  if (region == null) {
-    const regionAnswer: { region: string } = await prompt([
-      {
-        choices: AWS_REGIONS,
-        message: "Choose the region",
-        name: "region",
-        type: "list",
-      },
-    ]);
-    region = regionAnswer.region;
-  }
+  const accessKeyId = Store.get<string>("accessKeyId");
+  const secretAccessKey = Store.get<string>("secretAccessKey");
+  const region = Store.get<string>("region");
 
-  Store.set("region", region);
+  if (accessKeyId == null || secretAccessKey == null || region == null) {
+    console.log("\nLooks like invalid configs have been provided.");
+    console.log("\nPlease check everything again and restart this process.\n");
+    process.exit(0);
+    return;
+  }
 
   const options: ServiceConfigurationOptions = {
-    accessKeyId: awsAccessKeyId!,
+    accessKeyId,
     httpOptions: { agent: sslAgent },
     region,
-    secretAccessKey: awsSecretAccessKey!,
+    secretAccessKey,
   };
 
-  Store.set("db", new DynamoDB(options));
-};
-
-export const configureDB = async (connectToLocal = false) => {
-  if (connectToLocal) {
-    return configureForLocal();
+  if (env === "local") {
+    options.endpoint = `http://localhost:${Store.get("port")}`;
   }
 
-  return configureForRemote();
+  Store.set("db", new DynamoDB(options));
 };

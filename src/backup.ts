@@ -16,6 +16,7 @@ import { join } from "path";
 import { sync as rmSync } from "rimraf";
 import tar from "tar";
 import { oc } from "ts-optchain";
+import { argv } from "yargs";
 import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "./constants";
 import Store from "./store";
 import { isRetryableDBError, millisecondsToStr } from "./utils";
@@ -160,9 +161,6 @@ export const startBackupProcess = async () => {
     Store.set("maxLengths", maxLengths);
 
     spinner.stop();
-
-    const argv =
-      Store.get<Record<string, string | null | undefined>>("argv") || {};
 
     const tablesFromArgs = argv.tables;
 

@@ -1,22 +1,15 @@
 import { prompt } from "inquirer";
+import { argv } from "yargs";
+import { DBCActionEnv, DBCActionType } from "../types/action";
 import { ActionOptions } from "./constants";
 import Store from "./store";
 
-export const configureAction = async () => {
-  const argv =
-    Store.get<Record<string, string | null | undefined>>("argv") || {};
-
-  const actionFromArgs = argv.action;
-
+export const configureActionAndEnv = async () => {
   let action: ActionOptions | null = null;
 
-  if (actionFromArgs != null) {
-    if (
-      Object.values(ActionOptions).includes(
-        (actionFromArgs as unknown) as ActionOptions,
-      )
-    ) {
-      action = (actionFromArgs as unknown) as ActionOptions;
+  if (argv.action != null) {
+    if (Object.values(ActionOptions).includes(argv.action as ActionOptions)) {
+      action = argv.action as ActionOptions;
     } else {
       console.log("\nUnsupported action. Please select one!\n");
     }
@@ -38,9 +31,17 @@ export const configureAction = async () => {
     action = response.action;
   }
 
-  Store.set("action", action);
+  Store.set<DBCActionType>(
+    "action",
+    [
+      ActionOptions["Backup From Local"],
+      ActionOptions["Backup From Remote"],
+    ].includes(action)
+      ? "backup"
+      : "restore",
+  );
 
-  Store.set(
+  Store.set<DBCActionEnv>(
     "env",
     [
       ActionOptions["Backup From Local"],

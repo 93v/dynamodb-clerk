@@ -21,6 +21,7 @@ import { basename, extname, join } from "path";
 import { sync as rmSync } from "rimraf";
 import tar from "tar";
 import { oc } from "ts-optchain";
+import { argv } from "yargs";
 import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "./constants";
 import Store from "./store";
 import { findCommon, isRetryableDBError, millisecondsToStr } from "./utils";
@@ -249,10 +250,7 @@ export const startRestoreProcess = async () => {
     );
   });
 
-  const argv =
-    Store.get<Record<string, string | null | undefined>>("argv") || {};
-
-  const archiveFromArgs = argv.archive;
+  const archiveFromArgs = argv.archive as string | null;
 
   let archive: string | null = null;
 
@@ -324,8 +322,9 @@ export const startRestoreProcess = async () => {
     const dbTablesCommonPrefix = findCommon(tablesInDB);
     const dbTablesCommonSuffix = findCommon(tablesInDB, "suffix");
 
-    const archiveTablesSearchPatternFromArgs =
-      argv["archive-tables-search-pattern"];
+    const archiveTablesSearchPatternFromArgs = argv[
+      "archive-tables-search-pattern"
+    ] as string | null;
 
     let archiveTablesSearchPattern: string | null = null;
 
@@ -369,7 +368,9 @@ export const startRestoreProcess = async () => {
       archiveTablesSearchPattern = response.archiveTablesSearchPattern;
     }
 
-    const dbTablesReplacePatternFromArgs = argv["db-tables-replace-pattern"];
+    const dbTablesReplacePatternFromArgs = argv["db-tables-replace-pattern"] as
+      | string
+      | null;
 
     let dbTablesReplacePattern: string | null = null;
 

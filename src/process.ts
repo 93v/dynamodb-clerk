@@ -1,10 +1,9 @@
+import { DBCActionType } from "../types/action";
 import { startBackupProcess } from "./backup";
 import { startRestoreProcess } from "./restore";
+import Store from "./store";
 
-export const initProcess = async (type: "restore" | "backup") => {
-  if (type === "backup") {
-    return startBackupProcess();
-  }
-
-  return startRestoreProcess();
-};
+export const initProcess = async () =>
+  Store.get<DBCActionType>("action") === "backup"
+    ? startBackupProcess()
+    : startRestoreProcess();
