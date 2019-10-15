@@ -19,20 +19,23 @@ export const listAvailableProfiles = () => {
   }));
 };
 
-export const getProfileRegion = (profile: string): string | null => {
+export const getProfileProperty = (
+  profile: string,
+  property: "region" | "access_key_id" | "secret_access_key",
+): string | null => {
   const awsCredentials = PropertiesReader(
     `${process.env.HOME ||
       process.env.HOMEPATH ||
       process.env.USERPROFILE}/.aws/credentials`,
   );
 
-  const region =
-    awsCredentials.get(`${profile}.aws_region`) ||
-    awsCredentials.get(`${profile}.region`);
+  const value =
+    awsCredentials.get(`${profile}.aws_${property}`) ||
+    awsCredentials.get(`${profile}.${property}`);
 
-  if (typeof region === "number" || typeof region === "boolean") {
-    return region.toString();
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value.toString();
   }
 
-  return region;
+  return value;
 };

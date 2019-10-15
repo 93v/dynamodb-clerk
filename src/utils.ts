@@ -1,6 +1,8 @@
 import { spawn } from "child_process";
 import { lstatSync, readdirSync } from "fs";
 import { join } from "path";
+import { oc } from "ts-optchain";
+import { ILSOFProcess, IPSProcess } from "../types/process";
 
 export const isRetryableDBError = (ex: any) =>
   ["ProvisionedThroughputExceededException", "ThrottlingException"].includes(
@@ -101,7 +103,7 @@ export const readSizeRecursive = (item: string): number => {
   }
 };
 
-export const asyncSpawn = (
+const asyncSpawn = (
   command: string,
   args?: ReadonlyArray<string>,
 ): Promise<string> =>
@@ -132,7 +134,7 @@ export const asyncSpawn = (
     });
   });
 
-export const parseProcess = <T>(d: any, titles: string[] = []) => {
+const parseProcess = <T>(d: any, titles: string[] = []) => {
   const obj = {};
 
   let propIndex = 0;
@@ -148,4 +150,62 @@ export const parseProcess = <T>(d: any, titles: string[] = []) => {
   });
 
   return obj as T;
+};
+
+const getDynamoDBLocalProcesses = async () => {
+  const data = await asyncSpawn(`ps`, ["lx"]);
+
+  const [titles, ...parsedData] = data
+    .split("\n")
+    .map((line) => line.replace(/ +/gi, "\t").split("\t"));
+
+  return parsedData
+    .map((d) => parseProcess<IPSProcess>(d, titles))
+    .reduce((acc, val) => acc.concat(val), [] as IPSProcess[])
+    .filter(
+      (d) =>
+        oc(d)
+          .command("")
+          .includes("java") &&
+        Object.values(d).some((v) => (v || "").includes("DynamoDBLocal.jar")),
+    );
+};
+
+const getJavaProcessesListeningToTCPPorts = async () => {
+  const data = await asyncSpawn(`lsof`, ["-PiTCP", "-sTCP:LISTEN"]);
+
+  const [titles, ...parsedData] = data
+    .split("\n")
+    .map((line) => line.replace(/ +/gi, "\t").split("\t"));
+
+  return parsedData
+    .map((d) => parseProcess<ILSOFProcess>(d, titles))
+    .reduce((acc, val) => acc.concat(val), [] as ILSOFProcess[])
+    .filter((d) =>
+      oc(d)
+        .command("")
+        .includes("java"),
+    );
+};
+
+export const getLocalDynamoDBPorts = async () => {
+  const [dynamoDBLocalProcesses, javaProcesses] = await Promise.all([
+    getDynamoDBLocalProcesses(),
+    getJavaProcessesListeningToTCPPorts(),
+  ]);
+
+  const portsFromJavaProcesses = javaProcesses.map(
+    (p) =>
+      oc(p)
+        .name("")
+        .split(":")[1],
+  );
+  const portsFromDBLocalProcesses = dynamoDBLocalProcesses.map((p) => p.arg8);
+
+  const availablePorts = intersection(
+    portsFromJavaProcesses,
+    portsFromDBLocalProcesses,
+  );
+
+  return availablePorts;
 };
