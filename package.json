@@ -65,7 +65,7 @@
     "jest": "^24.9.0",
     "prettier": "^1.18.2",
     "sazerac": "^1.1.0",
-    "semantic-release": "^15.13.24",
+    "semantic-release": "^15.13.27",
     "ts-jest": "^24.1.0",
     "ts-node": "^8.4.1",
     "tslint": "^5.20.0",
@@ -78,7 +78,7 @@
   ],
   "dependencies": {
     "async-retry": "^1.2.3",
-    "aws-sdk": "^2.551.0",
+    "aws-sdk": "^2.553.0",
     "filesize": "^5.0.3",
     "inquirer": "^7.0.0",
     "listr": "^0.14.3",
