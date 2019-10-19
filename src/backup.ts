@@ -113,13 +113,15 @@ export const startBackupProcess = async () => {
   }
   const BACKUP_PATH = join(BACKUP_PATH_PREFIX, profile);
 
-  const spinner = ora("Loading tables").start();
+  const spinner = ora("Loading tables");
+  const spinner2 = ora("Optimizing");
 
   const db = Store.get<DynamoDB>("db");
   if (db == null) {
     throw new Error("Database config not found");
   }
   try {
+    spinner.start();
     const { TableNames: tableNames } = await db.listTables().promise();
 
     if (tableNames == null || tableNames.length === 0) {
@@ -257,6 +259,8 @@ export const startBackupProcess = async () => {
       await tasks.run();
     }
 
+    spinner2.start();
+
     await tar.c(
       {
         C: BACKUP_PATH_PREFIX,
@@ -268,13 +272,22 @@ export const startBackupProcess = async () => {
     );
     rmSync(BACKUP_PATH);
 
-    console.log(`Elapsed Time: ${millisecondsToStr(Date.now() - start)}`);
+    spinner2.stop();
+
+    console.log(
+      `${tables.length} tables backed up in ${millisecondsToStr(
+        Date.now() - start,
+      )}`,
+    );
     console.log(
       `Backup Size: ${filesize(lstatSync(`${BACKUP_PATH}.tgz`).size)}`,
     );
   } catch (error) {
+    console.error(error);
     throw error;
   } finally {
+    spinner2.stop();
     spinner.stop();
+    process.exit();
   }
 };
