@@ -1,19 +1,15 @@
 import retry from "async-retry";
 import { DynamoDB } from "aws-sdk";
 import {
-  // CreateTableInput,
   BatchWriteItemInput,
+  CreateTableInput,
   DescribeTableOutput,
-  // ScanInput,
+  GlobalSecondaryIndex,
+  LocalSecondaryIndex,
   ScanOutput,
   WriteRequests,
 } from "aws-sdk/clients/dynamodb";
-import {
-  // mkdirSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-} from "fs";
+import { readdirSync, readFileSync, statSync } from "fs";
 import { prompt } from "inquirer";
 import Listr, { ListrTask } from "listr";
 import ora from "ora";
@@ -33,12 +29,12 @@ const restoreTable = async (
   extractionFolder: string,
   tableNamesConversionMapping: Record<string, string>,
 ) => {
-  const path = `${BACKUP_PATH_PREFIX}/${extractionFolder}/${tableName}`;
-
   const db = Store.get<DynamoDB>("db");
   if (db == null) {
     throw new Error("Database config not found");
   }
+
+  const path = `${BACKUP_PATH_PREFIX}/${extractionFolder}/${tableName}`;
 
   try {
     const tableDescription: DescribeTableOutput = JSON.parse(
@@ -54,20 +50,110 @@ const restoreTable = async (
     const dbTableName =
       tableNamesConversionMapping[oc(table).TableName(tableName)] || tableName;
 
-    let tableExists = false;
+    try {
+      await db.deleteTable({ TableName: dbTableName }).promise();
+      // tslint:disable-next-line: no-empty
+    } catch {}
 
     try {
-      const tableDescriptionOnDB = await db
-        .describeTable({ TableName: dbTableName })
-        .promise();
+      const params: CreateTableInput = {
+        ...table,
+        AttributeDefinitions: oc(table).AttributeDefinitions([]),
+        KeySchema: oc(table).KeySchema([]),
+        TableName: dbTableName,
 
-      tableExists = tableDescriptionOnDB != null;
-    } catch (error) {
-      tableExists = false;
+        LocalSecondaryIndexes:
+          table.LocalSecondaryIndexes != null
+            ? table.LocalSecondaryIndexes.map(
+                (si): LocalSecondaryIndex => ({
+                  ...si,
+                  IndexName: oc(si).IndexName(""),
+                  KeySchema: oc(si).KeySchema([]),
+                  Projection: oc(si).Projection({}),
+                }),
+              )
+            : undefined,
 
-      console.log("Table Exists?", tableExists);
-      return;
-    }
+        GlobalSecondaryIndexes:
+          table.GlobalSecondaryIndexes != null
+            ? table.GlobalSecondaryIndexes.map(
+                (si): GlobalSecondaryIndex => {
+                  const config = {
+                    ...si,
+                    IndexName: oc(si).IndexName(""),
+                    KeySchema: oc(si).KeySchema([]),
+                    Projection: oc(si).Projection({}),
+
+                    ...(si.ProvisionedThroughput != null
+                      ? {
+                          ProvisionedThroughput: {
+                            ReadCapacityUnits:
+                              oc(si).ProvisionedThroughput.ReadCapacityUnits(
+                                1,
+                              ) || 1,
+                            WriteCapacityUnits:
+                              oc(si).ProvisionedThroughput.WriteCapacityUnits(
+                                1,
+                              ) || 1,
+                          },
+                        }
+                      : {
+                          BillingMode: oc(table).BillingModeSummary.BillingMode(
+                            "PAY_PER_REQUEST",
+                          ),
+                          ProvisionedThroughput: undefined,
+                        }),
+                  };
+
+                  for (const p of [
+                    "IndexStatus",
+                    "IndexSizeBytes",
+                    "IndexArn",
+                    "ItemCount",
+                  ]) {
+                    delete config[p];
+                  }
+
+                  return config;
+                },
+              )
+            : undefined,
+
+        ...(table.ProvisionedThroughput != null
+          ? {
+              ProvisionedThroughput: {
+                ReadCapacityUnits:
+                  oc(table).ProvisionedThroughput.ReadCapacityUnits(1) || 1,
+                WriteCapacityUnits:
+                  oc(table).ProvisionedThroughput.WriteCapacityUnits(1) || 1,
+              },
+            }
+          : {
+              BillingMode: oc(table).BillingModeSummary.BillingMode(
+                "PAY_PER_REQUEST",
+              ),
+              ProvisionedThroughput: undefined,
+            }),
+      };
+
+      for (const p of [
+        "BillingModeSummary",
+        "CreationDateTime",
+        "ItemCount",
+        "LatestStreamArn",
+        "LatestStreamLabel",
+        "SSEDescription",
+        "TableArn",
+        "TableId",
+        "TableSizeBytes",
+        "TableStatus",
+      ]) {
+        delete params[p];
+      }
+
+      await db.createTable(params).promise();
+      // tslint:disable-next-line: no-empty
+    } catch {}
 
     const dataFiles = readdirSync(`${path}/data`).filter(
       (file) => extname(file) === ".json",
@@ -118,123 +204,6 @@ const restoreTable = async (
         }, RETRY_OPTIONS);
       }),
     );
-
-    // if (!tableExists) {
-    //   const params: CreateTableInput = {
-    //     AttributeDefinitions: oc(table).AttributeDefinitions([]),
-    //     KeySchema: oc(table).KeySchema([]),
-    //     TableName: dbTableName,
-
-    //     LocalSecondaryIndexes: table.LocalSecondaryIndexes
-    //       ? oc(table)
-    //           .LocalSecondaryIndexes([])
-    //           .map(
-    //             (lsi): LocalSecondaryIndex => ({
-    //               IndexName: oc(lsi).IndexName(""),
-    //               KeySchema: oc(lsi).KeySchema([]),
-    //               Projection: oc(lsi).Projection({}),
-    //             }),
-    //           )
-    //       : undefined,
-
-    //     GlobalSecondaryIndexes: table.GlobalSecondaryIndexes
-    //       ? oc(table)
-    //           .GlobalSecondaryIndexes([])
-    //           .map(
-    //             (gsi): GlobalSecondaryIndex => {
-    //               console.log("GSI C", oc(gsi).IndexName(""));
-    //               return {
-    //                 IndexName: oc(gsi).IndexName(""),
-    //                 KeySchema: oc(gsi).KeySchema([]),
-    //                 Projection: oc(gsi).Projection({}),
-    //                 // ProvisionedThroughput: {
-    //                 //   ReadCapacityUnits: oc(
-    //                 //     gsi,
-    //                 //   ).ProvisionedThroughput.ReadCapacityUnits(1),
-    //                 //   WriteCapacityUnits: oc(
-    //                 //     gsi,
-    //                 //   ).ProvisionedThroughput.WriteCapacityUnits(1),
-    //                 // },
-    //               };
-    //             },
-    //           )
-    //       : undefined,
-
-    //     BillingMode: oc(table).BillingModeSummary.BillingMode(),
-
-    //     // ProvisionedThroughput: table.ProvisionedThroughput
-    //     //   ? {
-    //     //       ReadCapacityUnits: oc(
-    //     //         table,
-    //     //       ).ProvisionedThroughput.ReadCapacityUnits(1),
-    //     //       WriteCapacityUnits: oc(
-    //     //         table,
-    //     //       ).ProvisionedThroughput.WriteCapacityUnits(1),
-    //     //     }
-    //     //   : undefined,
-
-    //     StreamSpecification: oc(table).StreamSpecification(),
-
-    //     SSESpecification: table.SSEDescription
-    //       ? { SSEType: oc(table).SSEDescription.SSEType() }
-    //       : undefined,
-    //   };
-    //   await db.createTable(params).promise();
-    // } else {
-    //   const params: UpdateTableInput = {
-    //     AttributeDefinitions: oc(table).AttributeDefinitions([]),
-    //     TableName: dbTableName,
-
-    //     GlobalSecondaryIndexUpdates:
-    //       table.GlobalSecondaryIndexes && false
-    //         ? oc(table)
-    //             .GlobalSecondaryIndexes([])
-    //             .map(
-    //               (gsi): GlobalSecondaryIndexUpdate => {
-    //                 console.log("GSI U", oc(gsi).IndexName(""));
-    //                 return {};
-    //                 // return {
-    //                 //   Update: {
-    //                 //     IndexName: oc(gsi).IndexName(""),
-    //                 //     ProvisionedThroughput: {
-    //                 //       ReadCapacityUnits: oc(
-    //                 //         gsi,
-    //                 //       ).ProvisionedThroughput.ReadCapacityUnits(1),
-    //                 //       WriteCapacityUnits: oc(
-    //                 //         gsi,
-    //                 //       ).ProvisionedThroughput.WriteCapacityUnits(1),
-    //                 //     },
-    //                 //   },
-    //                 // };
-    //               },
-    //             )
-    //         : undefined,
-
-    //     BillingMode: oc(table).BillingModeSummary.BillingMode(),
-
-    //     // ProvisionedThroughput: table.ProvisionedThroughput
-    //     //   ? {
-    //     //       ReadCapacityUnits: oc(
-    //     //         table,
-    //     //       ).ProvisionedThroughput.ReadCapacityUnits(1),
-    //     //       WriteCapacityUnits: oc(
-    //     //         table,
-    //     //       ).ProvisionedThroughput.WriteCapacityUnits(1),
-    //     //     }
-    //     //   : undefined,
-
-    //     StreamSpecification: oc(table).StreamSpecification(),
-
-    //     SSESpecification: table.SSEDescription
-    //       ? { SSEType: oc(table).SSEDescription.SSEType() }
-    //       : undefined,
-    //   };
-    //   await db.updateTable(params).promise();
-    // }
-
-    // Create the table in the DB
-    // Read data from the archive
-    // Restore data to the DB
   } catch (error) {
     console.error(error);
   }
@@ -316,11 +285,7 @@ export const startRestoreProcess = async () => {
 
     const tablesInDB = oc(dbTables).TableNames([]);
 
-    const archiveTablesCommonPrefix = findCommon(tablesInArchive);
-    const archiveTablesCommonSuffix = findCommon(tablesInArchive, "suffix");
     let archiveHasPattern = true;
-    const dbTablesCommonPrefix = findCommon(tablesInDB);
-    const dbTablesCommonSuffix = findCommon(tablesInDB, "suffix");
 
     const archiveTablesSearchPatternFromArgs = argv[
       "archive-tables-search-pattern"
@@ -334,6 +299,9 @@ export const startRestoreProcess = async () => {
 
     if (archiveTablesSearchPattern == null) {
       let defaultArchiveTablesSearchPattern = "";
+
+      const archiveTablesCommonPrefix = findCommon(tablesInArchive);
+      const archiveTablesCommonSuffix = findCommon(tablesInArchive, "suffix");
 
       if (archiveTablesCommonPrefix != null) {
         defaultArchiveTablesSearchPattern += `^${archiveTablesCommonPrefix}`;
@@ -380,6 +348,9 @@ export const startRestoreProcess = async () => {
 
     if (dbTablesReplacePattern == null) {
       let defaultDBTablesReplacePattern = "";
+
+      const dbTablesCommonPrefix = findCommon(tablesInDB);
+      const dbTablesCommonSuffix = findCommon(tablesInDB, "suffix");
 
       if (dbTablesCommonPrefix != null) {
         defaultDBTablesReplacePattern += `${dbTablesCommonPrefix}`;

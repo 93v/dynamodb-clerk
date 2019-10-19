@@ -1,6 +1,7 @@
 import { DynamoDB } from "aws-sdk";
 import { ServiceConfigurationOptions } from "aws-sdk/lib/service";
-import { Agent } from "https";
+import { Agent as AgentHTTP } from "http";
+import { Agent as AgentHTTPS } from "https";
 import { prompt } from "inquirer";
 import { argv } from "yargs";
 import { DBCActionEnv } from "../types/action";
@@ -9,10 +10,15 @@ import { getProfileProperty, listAvailableProfiles } from "./profiles";
 import Store from "./store";
 import { getLocalDynamoDBPorts } from "./utils";
 
-const sslAgent = new Agent({
+const agentHttps = new AgentHTTPS({
   keepAlive: true,
   maxSockets: 50,
   rejectUnauthorized: true,
+});
+
+const agentHttp = new AgentHTTP({
+  keepAlive: true,
+  maxSockets: 50,
 });
 
 export const configureDB = async () => {
@@ -206,7 +212,7 @@ export const configureDB = async () => {
 
   const options: ServiceConfigurationOptions = {
     accessKeyId,
-    httpOptions: { agent: sslAgent },
+    httpOptions: { agent: env === "local" ? agentHttp : agentHttps },
     region,
     secretAccessKey,
   };
