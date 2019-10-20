@@ -184,8 +184,8 @@ const restoreTable = async (
               while (!writeCompleted) {
                 const result = await db.batchWriteItem(params).promise();
                 if (
-                  result.UnprocessedItems &&
-                  result.UnprocessedItems[dbTableName]
+                  result.UnprocessedItems != null &&
+                  result.UnprocessedItems[dbTableName] != null
                 ) {
                   params.RequestItems = result.UnprocessedItems;
                 } else {
