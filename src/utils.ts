@@ -200,7 +200,19 @@ export const getLocalDynamoDBPorts = async () => {
         .name("")
         .split(":")[1],
   );
-  const portsFromDBLocalProcesses = dynamoDBLocalProcesses.map((p) => p.arg8);
+  const portsFromDBLocalProcesses = dynamoDBLocalProcesses.map((p) => {
+    let port: string | null = null;
+
+    const keys = Object.keys(p);
+
+    Object.values(p).forEach((v, i) => {
+      if (v === "-port") {
+        port = p[keys[i + 1]] || null;
+      }
+    });
+
+    return port;
+  });
 
   const availablePorts = intersection(
     portsFromJavaProcesses,
