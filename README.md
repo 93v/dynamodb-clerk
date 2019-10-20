@@ -21,9 +21,9 @@ Backup and Restore DynamoDB Tables
 ## Examples
 
 ```bash
-npm start -- --action "restore-to-local" --port 8889 --access-key-id localAwsAccessKeyId --secret-access-key localAwsSecretAccessKey --archive myia-serverless-api-dev.tgz --archive-tables-search-pattern "(.+)" --db-tables-replace-pattern '\$1'
+npx dynamodb-clerk --action "restore-to-local" --port 8889 --access-key-id localAwsAccessKeyId --secret-access-key localAwsSecretAccessKey --archive backup.tgz --archive-tables-search-pattern "(.+)" --db-tables-replace-pattern '\$1'
 ```
 
 ```bash
-npm start -- --action "backup-from-remote" --profile profile-name --tables "*" --force
+npx dynamodb-clerk --action "backup-from-remote" --profile profile-name --tables "*" --force
 ```
