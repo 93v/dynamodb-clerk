@@ -1,5 +1,16 @@
 # DynamoDB Clerk
 
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/93v/dynamodb-clerk.svg)
+![GitHub repo size](https://img.shields.io/github/repo-size/93v/dynamodb-clerk.svg)
+![npm](https://img.shields.io/npm/dw/dynamodb-clerk.svg)
+![npm](https://img.shields.io/npm/dm/dynamodb-clerk.svg)
+![npm](https://img.shields.io/npm/dy/dynamodb-clerk.svg)
+![npm](https://img.shields.io/npm/dt/dynamodb-clerk.svg)
+![NPM](https://img.shields.io/npm/l/dynamodb-clerk.svg)
+![npm](https://img.shields.io/npm/v/dynamodb-clerk.svg)
+![GitHub last commit](https://img.shields.io/github/last-commit/93v/dynamodb-clerk.svg)
+![npm collaborators](https://img.shields.io/npm/collaborators/dynamodb-clerk.svg)
+
 Backup and Restore DynamoDB Tables
 
 ## CLI arguments
@@ -16,6 +27,7 @@ Backup and Restore DynamoDB Tables
 --region                          # AWS region
 --secret-access-key               # AWS Secret Access Key
 --tables                          # Use "*" to skip the list and archive all tables
+--version                         # Current version of DynamoDB Clerk
 ```
 
 ## Examples
