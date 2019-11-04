@@ -27,6 +27,7 @@ Backup and Restore DynamoDB Tables
 --region                          # AWS region
 --secret-access-key               # AWS Secret Access Key
 --tables                          # Use "*" to skip the list and archive all tables
+--version                         # Current version of DynamoDB Clerk
 ```
 
 ## Examples
