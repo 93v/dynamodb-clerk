@@ -79,7 +79,7 @@
   "dependencies": {
     "async-retry": "^1.2.3",
     "aws-sdk": "^2.563.0",
-    "filesize": "^5.0.3",
+    "filesize": "^6.0.0",
     "inquirer": "^7.0.0",
     "listr": "^0.14.3",
     "ora": "^4.0.2",
