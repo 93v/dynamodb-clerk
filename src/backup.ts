@@ -1,7 +1,6 @@
 import retry from "async-retry";
 import { DynamoDB } from "aws-sdk";
 import { ScanInput } from "aws-sdk/clients/dynamodb";
-import filesize from "filesize";
 import {
   existsSync,
   lstatSync,
@@ -13,6 +12,7 @@ import { prompt } from "inquirer";
 import Listr, { ListrTask, ListrTaskWrapper } from "listr";
 import ora from "ora";
 import { join } from "path";
+import prettyBytes from "pretty-bytes";
 import { sync as rmSync } from "rimraf";
 import tar from "tar";
 import { oc } from "ts-optchain";
@@ -182,7 +182,7 @@ export const startBackupProcess = async () => {
               .padEnd(maxLengths.tableNameLength, " ")} - Items: ~${oc(table)
               .itemCount(0)
               .toString()
-              .padEnd(maxLengths.itemCountLength, " ")} - Size: ~${filesize(
+              .padEnd(maxLengths.itemCountLength, " ")} - Size: ~${prettyBytes(
               oc(table).tableSize(0),
             )}`,
             short: table.tableName,
@@ -280,7 +280,7 @@ export const startBackupProcess = async () => {
       )}`,
     );
     console.log(
-      `Backup Size: ${filesize(lstatSync(`${BACKUP_PATH}.tgz`).size)}`,
+      `Backup Size: ${prettyBytes(lstatSync(`${BACKUP_PATH}.tgz`).size)}`,
     );
   } catch (error) {
     console.error(error);
