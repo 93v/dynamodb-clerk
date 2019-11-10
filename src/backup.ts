@@ -15,7 +15,6 @@ import { join } from "path";
 import prettyBytes from "pretty-bytes";
 import { sync as rmSync } from "rimraf";
 import tar from "tar";
-import { oc } from "ts-optchain";
 import { argv } from "yargs";
 import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "./constants";
 import Store from "./store";
@@ -78,14 +77,14 @@ const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
             const maxLengths = Store.get<IMaxLengths>("maxLengths");
 
             const tableProgress = Math.min(
-              oc(tableDescription).Table.ItemCount(0) === 0
+              (tableDescription.Table?.ItemCount || 0) === 0
                 ? 1
-                : processedItems / oc(tableDescription).Table.ItemCount(0),
+                : processedItems / (tableDescription.Table?.ItemCount || 0),
               1,
             );
 
             task.title = `${tableName.padEnd(
-              oc(maxLengths).tableNameLength(0),
+              maxLengths?.tableNameLength || 0,
             )} - ${(tableProgress * 100).toFixed(2)}%`;
           }
         }
@@ -138,23 +137,21 @@ export const startBackupProcess = async () => {
 
     const sortedTables = tableDescriptions
       .map((desc) => ({
-        itemCount: oc(desc).Table.ItemCount() || null,
-        tableName: oc(desc).Table.TableName() || null,
-        tableSize: oc(desc).Table.TableSizeBytes() || null,
+        itemCount: desc.Table?.ItemCount || null,
+        tableName: desc.Table?.TableName || null,
+        tableSize: desc.Table?.TableSizeBytes || null,
       }))
-      .sort((a, b) => oc(b).tableSize(0) - oc(a).tableSize(0));
+      .sort((a, b) => (b.tableSize || 0) - (a.tableSize || 0));
 
     const maxLengths: IMaxLengths = sortedTables.reduce(
       (p, c) => ({
         itemCountLength: Math.max(
           p.itemCountLength,
-          oc(c)
-            .itemCount(0)
-            .toString().length,
+          (c.itemCount || 0).toString().length,
         ),
         tableNameLength: Math.max(
           p.tableNameLength,
-          oc(c).tableName("").length,
+          (c.tableName || "").length,
         ),
       }),
       { itemCountLength: 0, tableNameLength: 0 },
@@ -177,13 +174,13 @@ export const startBackupProcess = async () => {
         {
           choices: sortedTables.map((table) => ({
             checked: true,
-            name: `${oc(table)
-              .tableName("")
-              .padEnd(maxLengths.tableNameLength, " ")} - Items: ~${oc(table)
-              .itemCount(0)
+            name: `${(table.tableName || "").padEnd(
+              maxLengths.tableNameLength,
+              " ",
+            )} - Items: ~${(table.itemCount || 0)
               .toString()
               .padEnd(maxLengths.itemCountLength, " ")} - Size: ~${prettyBytes(
-              oc(table).tableSize(0),
+              table.tableSize || 0,
             )}`,
             short: table.tableName,
             value: table.tableName,
@@ -247,7 +244,7 @@ export const startBackupProcess = async () => {
               task: async (_, task) => {
                 await backupTable(table, task);
                 task.title = `${table.padEnd(
-                  oc(maxLengths).tableNameLength(0),
+                  maxLengths.tableNameLength || 0,
                 )} - Done`;
               },
             }),

@@ -1,7 +1,6 @@
 import { spawn } from "child_process";
 import { lstatSync, readdirSync } from "fs";
 import { join } from "path";
-import { oc } from "ts-optchain";
 import { ILSOFProcess, IPSProcess } from "../types/process";
 
 export const isRetryableDBError = (ex: any) =>
@@ -164,9 +163,7 @@ const getDynamoDBLocalProcesses = async () => {
     .reduce((acc, val) => acc.concat(val), [] as IPSProcess[])
     .filter(
       (d) =>
-        oc(d)
-          .command("")
-          .includes("java") &&
+        d.command?.includes("java") &&
         Object.values(d).some((v) => (v || "").includes("DynamoDBLocal.jar")),
     );
 };
@@ -181,11 +178,7 @@ const getJavaProcessesListeningToTCPPorts = async () => {
   return parsedData
     .map((d) => parseProcess<ILSOFProcess>(d, titles))
     .reduce((acc, val) => acc.concat(val), [] as ILSOFProcess[])
-    .filter((d) =>
-      oc(d)
-        .command("")
-        .includes("java"),
-    );
+    .filter((d) => d.command?.includes("java"));
 };
 
 export const getLocalDynamoDBPorts = async () => {
@@ -195,10 +188,7 @@ export const getLocalDynamoDBPorts = async () => {
   ]);
 
   const portsFromJavaProcesses = javaProcesses.map(
-    (p) =>
-      oc(p)
-        .name("")
-        .split(":")[1],
+    (p) => p.name?.split(":")[1],
   );
   const portsFromDBLocalProcesses = dynamoDBLocalProcesses.map((p) => {
     let port: string | null = null;

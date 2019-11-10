@@ -16,7 +16,6 @@ import ora from "ora";
 import { basename, extname, join } from "path";
 import { sync as rmSync } from "rimraf";
 import tar from "tar";
-import { oc } from "ts-optchain";
 import { argv } from "yargs";
 import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "./constants";
 import Store from "./store";
@@ -48,7 +47,7 @@ const restoreTable = async (
     }
 
     const dbTableName =
-      tableNamesConversionMapping[oc(table).TableName(tableName)] || tableName;
+      tableNamesConversionMapping[table.TableName || tableName] || tableName;
 
     try {
       await db.deleteTable({ TableName: dbTableName }).promise();
@@ -58,8 +57,8 @@ const restoreTable = async (
     try {
       const params: CreateTableInput = {
         ...table,
-        AttributeDefinitions: oc(table).AttributeDefinitions([]),
-        KeySchema: oc(table).KeySchema([]),
+        AttributeDefinitions: table.AttributeDefinitions || [],
+        KeySchema: table.KeySchema || [],
         TableName: dbTableName,
 
         LocalSecondaryIndexes:
@@ -67,9 +66,9 @@ const restoreTable = async (
             ? table.LocalSecondaryIndexes.map(
                 (si): LocalSecondaryIndex => ({
                   ...si,
-                  IndexName: oc(si).IndexName(""),
-                  KeySchema: oc(si).KeySchema([]),
-                  Projection: oc(si).Projection({}),
+                  IndexName: si.IndexName || "",
+                  KeySchema: si.KeySchema || [],
+                  Projection: si.Projection || {},
                 }),
               )
             : undefined,
@@ -80,27 +79,23 @@ const restoreTable = async (
                 (si): GlobalSecondaryIndex => {
                   const config = {
                     ...si,
-                    IndexName: oc(si).IndexName(""),
-                    KeySchema: oc(si).KeySchema([]),
-                    Projection: oc(si).Projection({}),
+                    IndexName: si.IndexName || "",
+                    KeySchema: si.KeySchema || [],
+                    Projection: si.Projection || {},
 
                     ...(si.ProvisionedThroughput != null
                       ? {
                           ProvisionedThroughput: {
                             ReadCapacityUnits:
-                              oc(si).ProvisionedThroughput.ReadCapacityUnits(
-                                1,
-                              ) || 1,
+                              si.ProvisionedThroughput.ReadCapacityUnits || 1,
                             WriteCapacityUnits:
-                              oc(si).ProvisionedThroughput.WriteCapacityUnits(
-                                1,
-                              ) || 1,
+                              si.ProvisionedThroughput.WriteCapacityUnits || 1,
                           },
                         }
                       : {
-                          BillingMode: oc(table).BillingModeSummary.BillingMode(
+                          BillingMode:
+                            table.BillingModeSummary?.BillingMode ||
                             "PAY_PER_REQUEST",
-                          ),
                           ProvisionedThroughput: undefined,
                         }),
                   };
@@ -123,15 +118,14 @@ const restoreTable = async (
           ? {
               ProvisionedThroughput: {
                 ReadCapacityUnits:
-                  oc(table).ProvisionedThroughput.ReadCapacityUnits(1) || 1,
+                  table.ProvisionedThroughput.ReadCapacityUnits || 1,
                 WriteCapacityUnits:
-                  oc(table).ProvisionedThroughput.WriteCapacityUnits(1) || 1,
+                  table.ProvisionedThroughput.WriteCapacityUnits || 1,
               },
             }
           : {
-              BillingMode: oc(table).BillingModeSummary.BillingMode(
-                "PAY_PER_REQUEST",
-              ),
+              BillingMode:
+                table.BillingModeSummary?.BillingMode || "PAY_PER_REQUEST",
               ProvisionedThroughput: undefined,
             }),
       };
@@ -165,7 +159,7 @@ const restoreTable = async (
           readFileSync(`${path}/data/${dataFile}`, "utf8"),
         );
 
-        const items = oc(data).Items([]);
+        const items = data.Items || [];
 
         const requests: WriteRequests = items.map((item) => ({
           PutRequest: { Item: item },
@@ -273,9 +267,9 @@ export const startRestoreProcess = async () => {
 
     const dbTables = await db.listTables().promise();
 
-    const extractionFolder: string = oc(filesInArchive as any)
-      .path("")
-      .replace("/", "");
+    const extractionFolder: string = (
+      (filesInArchive as any).path || ""
+    ).replace("/", "");
 
     const tablesInArchive = readdirSync(
       `${BACKUP_PATH_PREFIX}/${extractionFolder}`,
@@ -283,7 +277,7 @@ export const startRestoreProcess = async () => {
 
     spinner.stop();
 
-    const tablesInDB = oc(dbTables).TableNames([]);
+    const tablesInDB = dbTables.TableNames || [];
 
     let archiveHasPattern = true;
 
