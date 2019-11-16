@@ -1,4 +1,4 @@
-export interface ILSOFProcess {
+export interface LSOFProcess {
   command?: string;
   pid?: string;
   user?: string;
@@ -11,7 +11,7 @@ export interface ILSOFProcess {
   [key: string]: string | undefined;
 }
 
-export interface IPSProcess {
+export interface PSProcess {
   ""?: string;
   uid?: string;
   pid?: string;

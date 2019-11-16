@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import { lstatSync, readdirSync } from "fs";
 import { join } from "path";
-import { ILSOFProcess, IPSProcess } from "../types/process";
+import { LSOFProcess, PSProcess } from "../types/process";
 
 export const isRetryableDBError = (ex: any) =>
   ["ProvisionedThroughputExceededException", "ThrottlingException"].includes(
@@ -159,8 +159,8 @@ const getDynamoDBLocalProcesses = async () => {
     .map((line) => line.replace(/ +/gi, "\t").split("\t"));
 
   return parsedData
-    .map((d) => parseProcess<IPSProcess>(d, titles))
-    .reduce((acc, val) => acc.concat(val), [] as IPSProcess[])
+    .map((d) => parseProcess<PSProcess>(d, titles))
+    .reduce((acc, val) => acc.concat(val), [] as PSProcess[])
     .filter(
       (d) =>
         d.command?.includes("java") &&
@@ -176,8 +176,8 @@ const getJavaProcessesListeningToTCPPorts = async () => {
     .map((line) => line.replace(/ +/gi, "\t").split("\t"));
 
   return parsedData
-    .map((d) => parseProcess<ILSOFProcess>(d, titles))
-    .reduce((acc, val) => acc.concat(val), [] as ILSOFProcess[])
+    .map((d) => parseProcess<LSOFProcess>(d, titles))
+    .reduce((acc, val) => acc.concat(val), [] as LSOFProcess[])
     .filter((d) => d.command?.includes("java"));
 };
 

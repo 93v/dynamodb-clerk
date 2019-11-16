@@ -24,7 +24,7 @@ if (!existsSync(BACKUP_PATH_PREFIX)) {
   mkdirSync(BACKUP_PATH_PREFIX);
 }
 
-interface IMaxLengths {
+interface MaxLengths {
   itemCountLength: number;
   tableNameLength: number;
 }
@@ -74,7 +74,7 @@ const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
             JSON.stringify(result, null, 2),
           );
           if (task != null) {
-            const maxLengths = Store.get<IMaxLengths>("maxLengths");
+            const maxLengths = Store.get<MaxLengths>("maxLengths");
 
             const tableProgress = Math.min(
               (tableDescription.Table?.ItemCount || 0) === 0
@@ -143,7 +143,7 @@ export const startBackupProcess = async () => {
       }))
       .sort((a, b) => (b.tableSize || 0) - (a.tableSize || 0));
 
-    const maxLengths: IMaxLengths = sortedTables.reduce(
+    const maxLengths: MaxLengths = sortedTables.reduce(
       (p, c) => ({
         itemCountLength: Math.max(
           p.itemCountLength,

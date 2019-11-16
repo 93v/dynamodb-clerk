@@ -51,7 +51,7 @@ const restoreTable = async (
 
     try {
       await db.deleteTable({ TableName: dbTableName }).promise();
-      // tslint:disable-next-line: no-empty
+      // eslint-disable-next-line no-empty
     } catch {}
 
     try {
@@ -146,7 +146,7 @@ const restoreTable = async (
       }
 
       await db.createTable(params).promise();
-      // tslint:disable-next-line: no-empty
+      // eslint-disable-next-line no-empty
     } catch {}
 
     const dataFiles = readdirSync(`${path}/data`).filter(
@@ -257,7 +257,7 @@ export const startRestoreProcess = async () => {
     const filesInArchive = await new Promise((resolve) => {
       tar.t({
         C: BACKUP_PATH_PREFIX,
-        file: join(BACKUP_PATH_PREFIX, archive!),
+        file: join(BACKUP_PATH_PREFIX, archive || ""),
         noResume: true,
         onentry: (entry) => {
           resolve(entry);
