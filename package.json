@@ -84,6 +84,6 @@
     "properties-reader": "^0.3.1",
     "rimraf": "^3.0.0",
     "tar": "^5.0.5",
-    "yargs": "^14.2.0"
+    "yargs": "^15.0.2"
   }
 }
