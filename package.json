@@ -81,7 +81,7 @@
     "listr": "^0.14.3",
     "ora": "^4.0.3",
     "pretty-bytes": "^5.3.0",
-    "properties-reader": "^0.3.1",
+    "properties-reader": "^1.0.0",
     "rimraf": "^3.0.0",
     "tar": "^5.0.5",
     "yargs": "^15.1.0"
