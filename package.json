@@ -83,7 +83,7 @@
     "pretty-bytes": "^5.3.0",
     "properties-reader": "^0.3.1",
     "rimraf": "^3.0.0",
-    "tar": "^5.0.5",
+    "tar": "^6.0.0",
     "yargs": "^15.1.0"
   }
 }
