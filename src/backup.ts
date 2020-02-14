@@ -16,6 +16,7 @@ import prettyBytes from "pretty-bytes";
 import { sync as rmSync } from "rimraf";
 import tar from "tar";
 import { argv } from "yargs";
+
 import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "./constants";
 import Store from "./store";
 import { isRetryableDBError, millisecondsToStr } from "./utils";

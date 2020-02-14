@@ -4,6 +4,7 @@ import { Agent as AgentHTTP } from "http";
 import { Agent as AgentHTTPS } from "https";
 import { prompt } from "inquirer";
 import { argv } from "yargs";
+
 import { DBCActionEnv } from "../types/action";
 import { AWS_REGIONS } from "./constants";
 import { getProfileProperty, listAvailableProfiles } from "./profiles";

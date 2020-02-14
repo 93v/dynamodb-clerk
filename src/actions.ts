@@ -1,5 +1,6 @@
 import { prompt } from "inquirer";
 import { argv } from "yargs";
+
 import { DBCActionEnv, DBCActionType } from "../types/action";
 import { ActionOptions } from "./constants";
 import Store from "./store";

@@ -1,3 +1,5 @@
+import { given, test } from "sazerac";
+
 import {
   assertNever,
   findCommon,
@@ -6,8 +8,6 @@ import {
   millisecondsToStr,
   numberEnding,
 } from "../utils";
-
-import { given, test } from "sazerac";
 
 describe("Utils", () => {
   describe("Retryable Errors", () => {

@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 import { lstatSync, readdirSync } from "fs";
 import { join } from "path";
+
 import { LSOFProcess, PSProcess } from "../types/process";
 
 export const isRetryableDBError = (ex: any) =>
