@@ -24,10 +24,23 @@ import { findCommon, isRetryableDBError, millisecondsToStr } from "./utils";
 
 const BATCH_OPTIONS = { writeLimit: 25 };
 
+const convertWithPatterns = (
+  str: string,
+  searchPattern: string | null,
+  replacePattern: string | null,
+) => {
+  if (searchPattern == null || replacePattern == null) {
+    return str;
+  }
+
+  return str.replace(new RegExp(searchPattern, "g"), replacePattern);
+};
+
 const restoreTable = async (
   tableName: string,
   extractionFolder: string,
-  tableNamesConversionMapping: Record<string, string>,
+  namesSearchPattern: string | null,
+  namesReplacePattern: string | null,
 ) => {
   const db = Store.get<DynamoDB>("db");
   if (db == null) {
@@ -47,8 +60,11 @@ const restoreTable = async (
       return;
     }
 
-    const dbTableName =
-      tableNamesConversionMapping[table.TableName || tableName] || tableName;
+    const dbTableName = convertWithPatterns(
+      table.TableName || tableName,
+      namesSearchPattern,
+      namesReplacePattern,
+    );
 
     try {
       await db.deleteTable({ TableName: dbTableName }).promise();
@@ -67,7 +83,11 @@ const restoreTable = async (
             ? table.LocalSecondaryIndexes.map(
                 (si): LocalSecondaryIndex => ({
                   ...si,
-                  IndexName: si.IndexName || "",
+                  IndexName: convertWithPatterns(
+                    si.IndexName || "",
+                    namesSearchPattern,
+                    namesReplacePattern,
+                  ),
                   KeySchema: si.KeySchema || [],
                   Projection: si.Projection || {},
                 }),
@@ -80,7 +100,11 @@ const restoreTable = async (
                 (si): GlobalSecondaryIndex => {
                   const config = {
                     ...si,
-                    IndexName: si.IndexName || "",
+                    IndexName: convertWithPatterns(
+                      si.IndexName || "",
+                      namesSearchPattern,
+                      namesReplacePattern,
+                    ),
                     KeySchema: si.KeySchema || [],
                     Projection: si.Projection || {},
 
@@ -323,7 +347,7 @@ export const startRestoreProcess = async () => {
               ? `${defaultArchiveTablesSearchPattern}`
               : null,
           message:
-            "Enter the archive table names search pattern (string, regex)",
+            "Enter the archive table names and indexes search pattern (string, regex)",
           name: "archiveTablesSearchPattern",
           type: "input",
         },
@@ -374,29 +398,13 @@ export const startRestoreProcess = async () => {
             ? defaultDBTablesReplacePattern
             : null,
           message:
-            "Enter the DynamoDB table names replace pattern (string, regex)",
+            "Enter the DynamoDB table names and indexes replace pattern (string, regex)",
           name: "dbTablesReplacePattern",
           type: "input",
         },
       ]);
       dbTablesReplacePattern = response.dbTablesReplacePattern;
     }
-
-    const tableNamesConversionMapping = {};
-
-    tablesInArchive.forEach((tableName) => {
-      if (
-        archiveTablesSearchPattern != null &&
-        dbTablesReplacePattern != null
-      ) {
-        tableNamesConversionMapping[tableName] = tableName.replace(
-          new RegExp(archiveTablesSearchPattern, "g"),
-          dbTablesReplacePattern,
-        );
-      } else {
-        tableNamesConversionMapping[tableName] = tableName;
-      }
-    });
 
     const start = Date.now();
 
@@ -413,7 +421,8 @@ export const startRestoreProcess = async () => {
                 restoreTable(
                   tableName,
                   extractionFolder,
-                  tableNamesConversionMapping,
+                  archiveTablesSearchPattern,
+                  dbTablesReplacePattern,
                 ),
             }),
           ),
