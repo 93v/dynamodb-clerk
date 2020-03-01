@@ -1,3 +1,4 @@
+[![Board Status](https://dev.azure.com/gevorggalstyan/67612eb8-9259-4f89-afaa-e95aa69663c3/a2ab7113-5bbb-44a4-a48d-8baa9f59498a/_apis/work/boardbadge/627e3661-afd5-418e-95b2-2a0a898a8aa0)](https://dev.azure.com/gevorggalstyan/67612eb8-9259-4f89-afaa-e95aa69663c3/_boards/board/t/a2ab7113-5bbb-44a4-a48d-8baa9f59498a/Microsoft.RequirementCategory)
 # DynamoDB Clerk
 
 ![David](https://img.shields.io/david/93v/dynamodb-clerk.svg)
