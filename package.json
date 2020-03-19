@@ -10,11 +10,11 @@
     "test:watch": "jest --watchAll",
     "build": "tsc",
     "watch": "tsc -w",
-    "start": "ts-node ./src/index.ts",
+    "start": "AWS_NODEJS_CONNECTION_REUSE_ENABLED='1' ts-node ./src/index.ts",
     "semantic-release": "semantic-release"
   },
   "bin": {
-    "dynamodb-clerk": "./dist/index.js"
+    "dynamodb-clerk": "AWS_NODEJS_CONNECTION_REUSE_ENABLED='1' ./dist/index.js"
   },
   "repository": {
     "type": "git",
