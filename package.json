@@ -54,7 +54,7 @@
     "@types/node": "^13.9.2",
     "@types/ora": "^3.2.0",
     "@types/properties-reader": "0.0.2",
-    "@types/rimraf": "^2.0.3",
+    "@types/rimraf": "^2.0.4",
     "@types/tar": "^4.0.3",
     "@types/yargs": "^15.0.4",
     "@typescript-eslint/eslint-plugin": "^2.24.0",
@@ -76,7 +76,7 @@
   ],
   "dependencies": {
     "async-retry": "^1.3.1",
-    "aws-sdk": "^2.642.0",
+    "aws-sdk": "^2.643.0",
     "inquirer": "^7.1.0",
     "listr": "^0.14.3",
     "ora": "^4.0.3",
