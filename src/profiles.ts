@@ -2,9 +2,9 @@ import PropertiesReader from "properties-reader";
 
 export const listAvailableProfiles = () => {
   const awsCredentials = PropertiesReader(
-    `${process.env.HOME ||
-      process.env.HOMEPATH ||
-      process.env.USERPROFILE}/.aws/credentials`,
+    `${
+      process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE
+    }/.aws/credentials`,
   );
 
   const credentials = awsCredentials.path() as Record<
@@ -24,9 +24,9 @@ export const getProfileProperty = (
   property: "region" | "access_key_id" | "secret_access_key",
 ): string | null => {
   const awsCredentials = PropertiesReader(
-    `${process.env.HOME ||
-      process.env.HOMEPATH ||
-      process.env.USERPROFILE}/.aws/credentials`,
+    `${
+      process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE
+    }/.aws/credentials`,
   );
 
   const value =
