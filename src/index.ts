@@ -10,6 +10,8 @@ import { initProcess } from "./process";
 
   console.clear();
 
+  process.env.AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1";
+
   await configureActionAndEnv();
 
   await configureDB();
