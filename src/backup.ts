@@ -109,8 +109,10 @@ export const startBackupProcess = async () => {
   }
 
   if (profile == null) {
-    throw new Error("Profile not found");
+    profile = new Date().toISOString();
+    Store.set("profile", profile);
   }
+
   const BACKUP_PATH = join(BACKUP_PATH_PREFIX, profile);
 
   const spinner = ora("Loading tables");

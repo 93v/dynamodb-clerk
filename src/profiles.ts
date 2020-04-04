@@ -1,11 +1,16 @@
+import { existsSync } from "fs";
 import PropertiesReader from "properties-reader";
 
+const awsCredentialsPath = `${
+  process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE
+}/.aws/credentials`;
+
 export const listAvailableProfiles = () => {
-  const awsCredentials = PropertiesReader(
-    `${
-      process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE
-    }/.aws/credentials`,
-  );
+  if (!existsSync(awsCredentialsPath)) {
+    return [];
+  }
+
+  const awsCredentials = PropertiesReader(awsCredentialsPath);
 
   const credentials = awsCredentials.path() as Record<
     string,
@@ -23,11 +28,11 @@ export const getProfileProperty = (
   profile: string,
   property: "region" | "access_key_id" | "secret_access_key",
 ): string | null => {
-  const awsCredentials = PropertiesReader(
-    `${
-      process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE
-    }/.aws/credentials`,
-  );
+  if (!existsSync(awsCredentialsPath)) {
+    return null;
+  }
+
+  const awsCredentials = PropertiesReader(awsCredentialsPath);
 
   const value =
     awsCredentials.get(`${profile}.aws_${property}`) ||

@@ -170,16 +170,25 @@ const getDynamoDBLocalProcesses = async () => {
 };
 
 const getJavaProcessesListeningToTCPPorts = async () => {
-  const data = await asyncSpawn(`lsof`, ["-PiTCP", "-sTCP:LISTEN"]);
+  try {
+    const data = await asyncSpawn(`lsof`, ["-PiTCP", "-sTCP:LISTEN"]);
+    const [titles, ...parsedData] = data
+      .split("\n")
+      .map((line) => line.replace(/ +/gi, "\t").split("\t"));
 
-  const [titles, ...parsedData] = data
-    .split("\n")
-    .map((line) => line.replace(/ +/gi, "\t").split("\t"));
+    return parsedData
+      .map((d) => parseProcess<LSOFProcess>(d, titles))
+      .reduce((acc, val) => acc.concat(val), [] as LSOFProcess[])
+      .filter((d) => d.command?.includes("java"));
+  } catch (error) {
+    console.error(
+      `Cannot launch the "lsof" command. Please make sure it is available on the system.`,
+    );
 
-  return parsedData
-    .map((d) => parseProcess<LSOFProcess>(d, titles))
-    .reduce((acc, val) => acc.concat(val), [] as LSOFProcess[])
-    .filter((d) => d.command?.includes("java"));
+    console.log("\n");
+
+    throw error;
+  }
 };
 
 export const getLocalDynamoDBPorts = async () => {
