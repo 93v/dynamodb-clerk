@@ -1,6 +1,6 @@
 import retry from "async-retry";
 import { DynamoDB } from "aws-sdk";
-import { ScanInput } from "aws-sdk/clients/dynamodb";
+import { DescribeTableOutput, ScanInput } from "aws-sdk/clients/dynamodb";
 import {
   existsSync,
   lstatSync,
@@ -21,14 +21,100 @@ import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "./constants";
 import Store from "./store";
 import { isRetryableDBError, millisecondsToStr } from "./utils";
 
-if (!existsSync(BACKUP_PATH_PREFIX)) {
-  mkdirSync(BACKUP_PATH_PREFIX);
-}
-
 interface MaxLengths {
   itemCountLength: number;
   tableNameLength: number;
 }
+
+if (!existsSync(BACKUP_PATH_PREFIX)) {
+  mkdirSync(BACKUP_PATH_PREFIX);
+}
+
+const MAX_TOTAL_SEGMENTS = 100;
+
+const backupSegment = async (
+  db: DynamoDB,
+  tableName: string,
+  tableDescription: DescribeTableOutput,
+  tableBackupPath: string,
+  totalSegments: number,
+  segment: number,
+  segmentProgresses: number[],
+  task?: ListrTaskWrapper,
+) => {
+  const params: ScanInput = {
+    TableName: tableName,
+    TotalSegments: totalSegments,
+    Segment: segment,
+  };
+
+  let scanCompleted = false;
+
+  let index = 0;
+  let segmentProcessedItems = 0;
+
+  return retry(async (bail) => {
+    try {
+      while (!scanCompleted) {
+        const result = await db.scan(params).promise();
+        if (result.LastEvaluatedKey == null) {
+          scanCompleted = true;
+        } else {
+          params.ExclusiveStartKey = result.LastEvaluatedKey;
+        }
+        if (result.Items) {
+          index++;
+          segmentProcessedItems += result.Items.length;
+
+          const fileName = `${segment
+            .toString()
+            .padStart(
+              totalSegments.toString().length,
+              "0",
+            )}${index
+            .toString()
+            .padStart(
+              Math.max(
+                Math.ceil(
+                  (tableDescription.Table?.ItemCount || 0) / totalSegments,
+                ).toString().length,
+                1,
+              ),
+              "0",
+            )}`;
+
+          writeFileSync(
+            `${tableBackupPath}/data/${fileName}.json`,
+            JSON.stringify(result, null, 2),
+          );
+          if (task != null) {
+            const maxLengths = Store.get<MaxLengths>("maxLengths");
+
+            segmentProgresses[segment] = segmentProcessedItems;
+
+            const tableProgress = Math.min(
+              (tableDescription.Table?.ItemCount || 0) === 0
+                ? 1
+                : segmentProgresses.reduce((a, b) => a + b, 0) /
+                    (tableDescription.Table?.ItemCount || 0),
+              1,
+            );
+
+            task.title = `${tableName.padEnd(
+              maxLengths?.tableNameLength || 0,
+            )} - ${(tableProgress * 100).toFixed(2)}%`;
+          }
+        }
+      }
+    } catch (error) {
+      if (!isRetryableDBError(error)) {
+        bail(error);
+        return;
+      }
+      throw error;
+    }
+  }, RETRY_OPTIONS);
+};
 
 const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
   const db = Store.get<DynamoDB>("db");
@@ -51,53 +137,27 @@ const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
     JSON.stringify(tableDescription, null, 2),
   );
 
-  const params: ScanInput = { TableName: tableName };
+  const totalSegments = Math.min(
+    MAX_TOTAL_SEGMENTS,
+    tableDescription.Table?.ItemCount || 1,
+  );
 
-  let scanCompleted = false;
+  const segmentProgresses = Array(totalSegments).fill(0);
 
-  let index = 0;
-  let processedItems = 0;
-
-  return retry(async (bail) => {
-    try {
-      while (!scanCompleted) {
-        const result = await db.scan(params).promise();
-        if (result.LastEvaluatedKey == null) {
-          scanCompleted = true;
-        } else {
-          params.ExclusiveStartKey = result.LastEvaluatedKey;
-        }
-        if (result.Items) {
-          index++;
-          processedItems += result.Items.length;
-          writeFileSync(
-            `${tableBackupPath}/data/${index.toString().padStart(4, "0")}.json`,
-            JSON.stringify(result, null, 2),
-          );
-          if (task != null) {
-            const maxLengths = Store.get<MaxLengths>("maxLengths");
-
-            const tableProgress = Math.min(
-              (tableDescription.Table?.ItemCount || 0) === 0
-                ? 1
-                : processedItems / (tableDescription.Table?.ItemCount || 0),
-              1,
-            );
-
-            task.title = `${tableName.padEnd(
-              maxLengths?.tableNameLength || 0,
-            )} - ${(tableProgress * 100).toFixed(2)}%`;
-          }
-        }
-      }
-    } catch (error) {
-      if (!isRetryableDBError(error)) {
-        bail(error);
-        return;
-      }
-      throw error;
-    }
-  }, RETRY_OPTIONS);
+  return Promise.all(
+    [...Array(totalSegments).keys()].map(async (segment) => {
+      return backupSegment(
+        db,
+        tableName,
+        tableDescription,
+        tableBackupPath,
+        totalSegments,
+        segment,
+        segmentProgresses,
+        task,
+      );
+    }),
+  );
 };
 
 export const startBackupProcess = async () => {
