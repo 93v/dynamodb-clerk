@@ -226,7 +226,7 @@ export const startBackupProcess = async () => {
 
     const tablesFromArgs = argv.tables;
 
-    let tables: string[] = [];
+    let tables: string[];
 
     if (tablesFromArgs === "*") {
       tables = sortedTables
@@ -263,7 +263,7 @@ export const startBackupProcess = async () => {
     ) {
       const forceFromArgs = argv.force;
 
-      let overwriteOldBackups = false;
+      let overwriteOldBackups: boolean;
 
       if (forceFromArgs != null) {
         overwriteOldBackups = true;

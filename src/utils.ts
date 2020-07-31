@@ -214,10 +214,5 @@ export const getLocalDynamoDBPorts = async () => {
     return port;
   });
 
-  const availablePorts = intersection(
-    portsFromJavaProcesses,
-    portsFromDBLocalProcesses,
-  );
-
-  return availablePorts;
+  return intersection(portsFromJavaProcesses, portsFromDBLocalProcesses);
 };
