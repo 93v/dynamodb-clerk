@@ -79,7 +79,7 @@
     "aws-sdk": "^2.724.0",
     "inquirer": "^7.3.3",
     "listr": "^0.14.3",
-    "ora": "^4.0.5",
+    "ora": "^5.0.0",
     "pretty-bytes": "^5.3.0",
     "properties-reader": "^2.0.0",
     "rimraf": "^3.0.2",
