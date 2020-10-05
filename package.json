@@ -53,7 +53,7 @@
     "@types/listr": "^0.14.2",
     "@types/node": "^14.11.2",
     "@types/ora": "^3.2.0",
-    "@types/properties-reader": "0.0.2",
+    "@types/properties-reader": "2.1.0",
     "@types/rimraf": "^3.0.0",
     "@types/tar": "^4.0.3",
     "@types/yargs": "^15.0.7",
