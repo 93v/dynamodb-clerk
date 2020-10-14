@@ -1,4 +1,4 @@
-import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "../constants";
+import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "../_constants";
 
 describe("Constants", () => {
   test("Backup path prefix", () => {

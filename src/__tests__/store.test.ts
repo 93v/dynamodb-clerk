@@ -1,4 +1,4 @@
-import Store from "../store";
+import Store from "../_store";
 
 describe("Store", () => {
   describe("Store instance", () => {

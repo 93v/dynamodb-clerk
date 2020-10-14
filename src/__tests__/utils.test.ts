@@ -7,7 +7,7 @@ import {
   isRetryableDBError,
   millisecondsToStr,
   numberEnding,
-} from "../utils";
+} from "../_utils";
 
 describe("Utils", () => {
   describe("Retryable Errors", () => {

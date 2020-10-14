@@ -2,8 +2,8 @@ import { prompt } from "inquirer";
 import { argv } from "yargs";
 
 import { DBCActionEnv, DBCActionType } from "../types/action";
-import { ActionOptions } from "./constants";
-import Store from "./store";
+import { ActionOptions } from "./_constants";
+import Store from "./_store";
 
 export const configureActionAndEnv = async () => {
   let action: ActionOptions | null = null;
@@ -20,7 +20,6 @@ export const configureActionAndEnv = async () => {
     const response: { action: ActionOptions } = await prompt([
       {
         choices: Object.entries(ActionOptions).map(([name, value]) => ({
-          disabled: [ActionOptions["Restore To Remote"]].includes(value),
           name,
           value,
         })),

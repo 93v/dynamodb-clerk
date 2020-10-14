@@ -39,3 +39,7 @@ npx dynamodb-clerk --action "restore-to-local" --port 8889 --access-key-id local
 ```bash
 npx dynamodb-clerk --action "backup-from-remote" --profile profile-name --tables "*" --force
 ```
+
+```bash
+npx dynamodb-clerk --action "restore-to-remote" --profile profile-name --archive backup.tgz --archive-tables-search-pattern "(.+)" --db-tables-replace-pattern '\$1'
+```

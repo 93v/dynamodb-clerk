@@ -1,13 +1,11 @@
-import { DynamoDB } from "aws-sdk";
-import { ServiceConfigurationOptions } from "aws-sdk/lib/service";
 import { prompt } from "inquirer";
 import { argv } from "yargs";
 
 import { DBCActionEnv } from "../types/action";
-import { AWS_REGIONS } from "./constants";
+import { AWS_REGIONS } from "./_constants";
+import Store from "./_store";
+import { getLocalDynamoDBPorts } from "./_utils";
 import { getProfileProperty, listAvailableProfiles } from "./profiles";
-import Store from "./store";
-import { getLocalDynamoDBPorts } from "./utils";
 
 export const configureDB = async () => {
   const env = Store.get<DBCActionEnv>("env");
@@ -27,25 +25,37 @@ export const configureDB = async () => {
       }
     }
 
-    if (availablePorts.length === 0) {
+    if (availablePorts.length !== 0) {
+      if (port == null) {
+        const response: {
+          port: string;
+        } = await prompt([
+          {
+            choices: availablePorts,
+            message: "Select the port of DynamoDB Local?",
+            name: "port",
+            type: "list",
+          },
+        ]);
+        port = response.port;
+      }
+    } else {
       console.log("\nLooks like there are no DynamoDB instances running.");
       console.log(
-        "\nPlease launch the DynamoDB locally and restart this process.\n",
+        "\nPlease launch the DynamoDB locally and restart this process. Or ...\n",
       );
-      process.exit(0);
     }
 
     if (port == null) {
-      const response: {
-        port: string;
-      } = await prompt([
+      const response: { port: string } = await prompt([
         {
-          choices: availablePorts,
-          message: "Select the port of DynamoDB Local?",
+          message: "Enter the local server port",
           name: "port",
-          type: "list",
+          type: "input",
+          validate: (v) => !!v,
         },
       ]);
+
       port = response.port;
     }
 
@@ -195,18 +205,5 @@ export const configureDB = async () => {
     console.log("\nLooks like invalid configs have been provided.");
     console.log("\nPlease check everything again and restart this process.\n");
     process.exit(0);
-    return;
   }
-
-  const options: ServiceConfigurationOptions = {
-    accessKeyId,
-    region,
-    secretAccessKey,
-  };
-
-  if (env === "local") {
-    options.endpoint = `http://localhost:${Store.get("port")}`;
-  }
-
-  Store.set("db", new DynamoDB(options));
 };

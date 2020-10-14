@@ -1,28 +1,22 @@
-import retry from "async-retry";
-import { DynamoDB } from "aws-sdk";
-import {
-  BatchWriteItemInput,
-  CreateTableInput,
-  DescribeTableOutput,
-  GlobalSecondaryIndex,
-  LocalSecondaryIndex,
-  ScanOutput,
-  WriteRequests,
-} from "aws-sdk/clients/dynamodb";
+import PromisePool from "@supercharge/promise-pool";
+// import {
+//   CreateTableInput,
+//   DescribeTableOutput,
+//   GlobalSecondaryIndex,
+//   LocalSecondaryIndex,
+// } from "aws-sdk/clients/dynamodb";
 import { readdirSync, readFileSync, statSync } from "fs";
 import { prompt } from "inquirer";
-import Listr, { ListrTask } from "listr";
+import Listr, { ListrTask, ListrTaskWrapper } from "listr";
 import ora from "ora";
 import { basename, extname, join } from "path";
 import { sync as rmSync } from "rimraf";
 import tar from "tar";
 import { argv } from "yargs";
 
-import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "./constants";
-import Store from "./store";
-import { findCommon, isRetryableDBError, millisecondsToStr } from "./utils";
-
-const BATCH_OPTIONS = { writeLimit: 25 };
+import { BACKUP_PATH_PREFIX } from "./_constants";
+import { db } from "./_db";
+import { findCommon, millisecondsToStr } from "./_utils";
 
 const convertWithPatterns = (
   str: string,
@@ -41,20 +35,16 @@ const restoreTable = async (
   extractionFolder: string,
   namesSearchPattern: string | null,
   namesReplacePattern: string | null,
+  task?: ListrTaskWrapper,
 ) => {
-  const db = Store.get<DynamoDB>("db");
-  if (db == null) {
-    throw new Error("Database config not found");
-  }
-
   const path = `${BACKUP_PATH_PREFIX}/${extractionFolder}/${tableName}`;
 
   try {
-    const tableDescription: DescribeTableOutput = JSON.parse(
+    const tableDescription = JSON.parse(
       readFileSync(`${path}/description.json`, "utf8"),
     );
 
-    const table = tableDescription.Table;
+    const table = tableDescription;
 
     if (table == null) {
       return;
@@ -66,163 +56,47 @@ const restoreTable = async (
       namesReplacePattern,
     );
 
-    try {
-      await db.deleteTable({ TableName: dbTableName }).promise();
-      // eslint-disable-next-line no-empty
-    } catch {}
+    const tableData = await db("").Tables.describe(dbTableName).$();
 
-    try {
-      const params: CreateTableInput = {
-        ...table,
-        AttributeDefinitions: table.AttributeDefinitions || [],
-        KeySchema: table.KeySchema || [],
-        TableName: dbTableName,
-
-        LocalSecondaryIndexes:
-          table.LocalSecondaryIndexes != null
-            ? table.LocalSecondaryIndexes.map(
-                (si): LocalSecondaryIndex => ({
-                  ...si,
-                  IndexName: convertWithPatterns(
-                    si.IndexName || "",
-                    namesSearchPattern,
-                    namesReplacePattern,
-                  ),
-                  KeySchema: si.KeySchema || [],
-                  Projection: si.Projection || {},
-                }),
-              )
-            : undefined,
-
-        GlobalSecondaryIndexes:
-          table.GlobalSecondaryIndexes != null
-            ? table.GlobalSecondaryIndexes.map(
-                (si): GlobalSecondaryIndex => {
-                  const config = {
-                    ...si,
-                    IndexName: convertWithPatterns(
-                      si.IndexName || "",
-                      namesSearchPattern,
-                      namesReplacePattern,
-                    ),
-                    KeySchema: si.KeySchema || [],
-                    Projection: si.Projection || {},
-
-                    ...(si.ProvisionedThroughput != null
-                      ? {
-                          ProvisionedThroughput: {
-                            ReadCapacityUnits:
-                              si.ProvisionedThroughput.ReadCapacityUnits || 1,
-                            WriteCapacityUnits:
-                              si.ProvisionedThroughput.WriteCapacityUnits || 1,
-                          },
-                        }
-                      : {
-                          BillingMode:
-                            table.BillingModeSummary?.BillingMode ||
-                            "PAY_PER_REQUEST",
-                          ProvisionedThroughput: undefined,
-                        }),
-                  };
-
-                  for (const p of [
-                    "IndexStatus",
-                    "IndexSizeBytes",
-                    "IndexArn",
-                    "ItemCount",
-                  ]) {
-                    delete config[p];
-                  }
-
-                  return config;
-                },
-              )
-            : undefined,
-
-        ...(table.ProvisionedThroughput != null
-          ? {
-              ProvisionedThroughput: {
-                ReadCapacityUnits:
-                  table.ProvisionedThroughput.ReadCapacityUnits || 1,
-                WriteCapacityUnits:
-                  table.ProvisionedThroughput.WriteCapacityUnits || 1,
-              },
-            }
-          : {
-              BillingMode:
-                table.BillingModeSummary?.BillingMode || "PAY_PER_REQUEST",
-              ProvisionedThroughput: undefined,
-            }),
-      };
-
-      for (const p of [
-        "BillingModeSummary",
-        "CreationDateTime",
-        "ItemCount",
-        "LatestStreamArn",
-        "LatestStreamLabel",
-        "SSEDescription",
-        "TableArn",
-        "TableId",
-        "TableSizeBytes",
-        "TableStatus",
-      ]) {
-        delete params[p];
-      }
-
-      await db.createTable(params).promise();
-      // eslint-disable-next-line no-empty
-    } catch {}
+    if (tableData == null) {
+      return;
+    }
 
     const dataFiles = readdirSync(`${path}/data`).filter(
       (file) => extname(file) === ".json",
     );
 
-    await Promise.all(
-      dataFiles.map(async (dataFile) => {
-        const data: ScanOutput = JSON.parse(
+    let processedFiles = 0;
+
+    await new PromisePool()
+      .for(dataFiles)
+      .withConcurrency(10)
+      .process(async (dataFile) => {
+        const data = JSON.parse(
           readFileSync(`${path}/data/${dataFile}`, "utf8"),
         );
 
-        const items = data.Items || [];
+        await db(dbTableName)
+          .batchPut(data || [])
+          .$();
 
-        const requests: WriteRequests = items.map((item) => ({
-          PutRequest: { Item: item },
-        }));
+        processedFiles++;
 
-        const params: BatchWriteItemInput = { RequestItems: {} };
+        const tableProgress = Math.min(
+          (dataFiles.length || 0) === 0
+            ? 1
+            : processedFiles / (dataFiles.length || 0),
+          1,
+        );
 
-        await retry(async (bail) => {
-          try {
-            while (requests.length > 0) {
-              let writeCompleted = false;
-              params.RequestItems[dbTableName] = requests.splice(
-                0,
-                BATCH_OPTIONS.writeLimit,
-              );
-              while (!writeCompleted) {
-                const result = await db.batchWriteItem(params).promise();
-                if (
-                  result.UnprocessedItems != null &&
-                  result.UnprocessedItems[dbTableName] != null
-                ) {
-                  params.RequestItems = result.UnprocessedItems;
-                } else {
-                  writeCompleted = true;
-                }
-              }
-            }
-            return true;
-          } catch (ex) {
-            if (!isRetryableDBError(ex)) {
-              bail(ex);
-              return;
-            }
-            throw ex;
-          }
-        }, RETRY_OPTIONS);
-      }),
-    );
+        if (task != null) {
+          task.title = `${tableName.padEnd(100 || 0)} - ${
+            tableProgress >= 0.99995 && tableProgress <= 1 ? "~" : ""
+          }${(tableProgress * 100).toFixed(2)}%`;
+        }
+
+        return true;
+      });
   } catch (error) {
     console.error(error);
   }
@@ -269,11 +143,6 @@ export const startRestoreProcess = async () => {
   const spinner = ora("Decompressing the archive").start();
 
   try {
-    const db = Store.get<DynamoDB>("db");
-    if (db == null) {
-      throw new Error("Database config not found");
-    }
-
     await tar.x({
       C: BACKUP_PATH_PREFIX,
       file: join(BACKUP_PATH_PREFIX, archive),
@@ -290,7 +159,7 @@ export const startRestoreProcess = async () => {
       });
     });
 
-    const dbTables = await db.listTables().promise();
+    const dbTables = await db("").Tables.list().$();
 
     const extractionFolder: string = (
       (filesInArchive as any).path || ""
@@ -302,7 +171,7 @@ export const startRestoreProcess = async () => {
 
     spinner.stop();
 
-    const tablesInDB = dbTables.TableNames || [];
+    const tablesInDB = dbTables || [];
 
     let archiveHasPattern = true;
 
@@ -417,17 +286,20 @@ export const startRestoreProcess = async () => {
             (tableName): ListrTask => ({
               title: tableName,
 
-              task: async () =>
-                restoreTable(
+              task: async (_, task) => {
+                await restoreTable(
                   tableName,
                   extractionFolder,
                   archiveTablesSearchPattern,
                   dbTablesReplacePattern,
-                ),
+                  task,
+                );
+                task.title = `${tableName.padEnd(100 || 0)} - Done`;
+              },
             }),
           ),
         ],
-        { concurrent: true },
+        { concurrent: 5 },
       );
 
       await tasks.run();

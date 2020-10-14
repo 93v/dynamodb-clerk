@@ -1,6 +1,7 @@
-import retry from "async-retry";
-import { DynamoDB } from "aws-sdk";
-import { DescribeTableOutput, ScanInput } from "aws-sdk/clients/dynamodb";
+import PromisePool from "@supercharge/promise-pool";
+import { DocumentClient, TableDescription } from "aws-sdk/clients/dynamodb";
+import { Dynatron } from "dynatron";
+import { preStringify } from "dynatron/dist/utils/misc-utils";
 import {
   existsSync,
   lstatSync,
@@ -17,113 +18,91 @@ import { sync as rmSync } from "rimraf";
 import tar from "tar";
 import { argv } from "yargs";
 
-import { BACKUP_PATH_PREFIX, RETRY_OPTIONS } from "./constants";
-import Store from "./store";
-import { isRetryableDBError, millisecondsToStr } from "./utils";
+import { BACKUP_PATH_PREFIX } from "./_constants";
+import { db } from "./_db";
+import Store from "./_store";
+import { millisecondsToStr } from "./_utils";
 
 interface MaxLengths {
   itemCountLength: number;
   tableNameLength: number;
 }
 
-if (!existsSync(BACKUP_PATH_PREFIX)) {
-  mkdirSync(BACKUP_PATH_PREFIX);
-}
-
-const MAX_TOTAL_SEGMENTS = 100;
+const MAX_TOTAL_SEGMENTS = 200;
 
 const backupSegment = async (
-  db: DynamoDB,
+  dbInstance: Dynatron,
   tableName: string,
-  tableDescription: DescribeTableOutput,
+  tableDescription: TableDescription,
   tableBackupPath: string,
   totalSegments: number,
   segment: number,
   segmentProgresses: number[],
   task?: ListrTaskWrapper,
 ) => {
-  const params: ScanInput = {
-    TableName: tableName,
-    TotalSegments: totalSegments,
-    Segment: segment,
-  };
+  let segmentScanComplete = false;
 
-  let scanCompleted = false;
+  let startKey: DocumentClient.Key | null = null;
 
-  let index = 0;
-  let segmentProcessedItems = 0;
+  let part = 0;
 
-  return retry(async (bail) => {
-    try {
-      while (!scanCompleted) {
-        const result = await db.scan(params).promise();
-        if (result.LastEvaluatedKey == null) {
-          scanCompleted = true;
-        } else {
-          params.ExclusiveStartKey = result.LastEvaluatedKey;
-        }
-        if (result.Items) {
-          index++;
-          segmentProcessedItems += result.Items.length;
+  while (!segmentScanComplete) {
+    part++;
 
-          const fileName = `${segment
-            .toString()
-            .padStart(
-              totalSegments.toString().length,
-              "0",
-            )}${index
-            .toString()
-            .padStart(
-              Math.max(
-                Math.ceil(
-                  (tableDescription.Table?.ItemCount || 0) / totalSegments,
-                ).toString().length,
-                1,
-              ),
-              "0",
-            )}`;
+    const result: DocumentClient.ScanOutput = await dbInstance
+      .scan()
+      .totalSegments(totalSegments)
+      .segment(segment)
+      .start(startKey)
+      .$(true, true);
 
-          writeFileSync(
-            `${tableBackupPath}/data/${fileName}.json`,
-            JSON.stringify(result, null, 2),
-          );
-          if (task != null) {
-            const maxLengths = Store.get<MaxLengths>("maxLengths");
-
-            segmentProgresses[segment] = segmentProcessedItems;
-
-            const tableProgress = Math.min(
-              (tableDescription.Table?.ItemCount || 0) === 0
-                ? 1
-                : segmentProgresses.reduce((a, b) => a + b, 0) /
-                    (tableDescription.Table?.ItemCount || 0),
-              1,
-            );
-
-            task.title = `${tableName.padEnd(
-              maxLengths?.tableNameLength || 0,
-            )} - ${(tableProgress * 100).toFixed(2)}%`;
-          }
-        }
-      }
-    } catch (error) {
-      if (!isRetryableDBError(error)) {
-        bail(error);
-        return;
-      }
-      throw error;
+    if (result.LastEvaluatedKey) {
+      startKey = result.LastEvaluatedKey;
+    } else {
+      segmentScanComplete = true;
     }
-  }, RETRY_OPTIONS);
+
+    const scannedItems = result.Items;
+
+    const segmentText = `${segment}`.padStart(8, "0");
+    const totalSegmentsText = `${totalSegments}`.padStart(8, "0");
+
+    const fileName = `segment-${segmentText}-of-${totalSegmentsText}-part-${part}`;
+
+    writeFileSync(
+      `${tableBackupPath}/data/${fileName}.json`,
+      JSON.stringify(scannedItems?.map((r) => preStringify(r))),
+    );
+    if (task != null) {
+      const maxLengths = Store.get<MaxLengths>("maxLengths");
+
+      segmentProgresses[segment] = segmentProgresses[segment] || 0;
+
+      segmentProgresses[segment] =
+        segmentProgresses[segment] + (scannedItems?.length || 0);
+
+      const totalSegmentProgress = segmentProgresses.reduce((a, b) => a + b, 0);
+
+      const tableProgress = Math.min(
+        (tableDescription?.ItemCount || 0) === 0
+          ? 1
+          : totalSegmentProgress / (tableDescription?.ItemCount || 0),
+        1,
+      );
+
+      task.title = `${tableName.padEnd(maxLengths?.tableNameLength || 0)} - ${
+        tableProgress >= 0.99995 && tableProgress <= 1 ? "~" : ""
+      }${(tableProgress * 100).toFixed(2)}%`;
+    }
+  }
 };
 
 const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
-  const db = Store.get<DynamoDB>("db");
-  if (db == null) {
-    throw new Error("Database config not found");
+  const tableDescription = await db("").Tables.describe(tableName).$();
+
+  if (tableDescription == null) {
+    return;
   }
-  const tableDescription = await db
-    .describeTable({ TableName: tableName })
-    .promise();
 
   const tableBackupPath = `${BACKUP_PATH_PREFIX}/${Store.get(
     "profile",
@@ -139,28 +118,37 @@ const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
 
   const totalSegments = Math.min(
     MAX_TOTAL_SEGMENTS,
-    tableDescription.Table?.ItemCount || 1,
+    Math.ceil((tableDescription.TableSizeBytes || 0) / 1024) || 1,
   );
 
   const segmentProgresses = Array(totalSegments).fill(0);
 
-  return Promise.all(
-    [...Array(totalSegments).keys()].map(async (segment) => {
-      return backupSegment(
-        db,
+  const dbInstance = db(tableName);
+
+  await new PromisePool()
+    .for([...Array(totalSegments).keys()])
+    .withConcurrency(20)
+    .process(async (segment) => {
+      const result = await backupSegment(
+        dbInstance,
         tableName,
         tableDescription,
         tableBackupPath,
         totalSegments,
-        segment,
+        segment as number,
         segmentProgresses,
         task,
       );
-    }),
-  );
+
+      return result;
+    });
 };
 
 export const startBackupProcess = async () => {
+  if (!existsSync(BACKUP_PATH_PREFIX)) {
+    mkdirSync(BACKUP_PATH_PREFIX);
+  }
+
   let profile = Store.get<string>("profile");
 
   if (profile == null && Store.get<"remote" | "local">("env") === "local") {
@@ -178,13 +166,9 @@ export const startBackupProcess = async () => {
   const spinner = ora("Loading tables");
   const spinner2 = ora("Optimizing");
 
-  const db = Store.get<DynamoDB>("db");
-  if (db == null) {
-    throw new Error("Database config not found");
-  }
   try {
     spinner.start();
-    const { TableNames: tableNames } = await db.listTables().promise();
+    const tableNames = await db("").Tables.list().$();
 
     if (tableNames == null || tableNames.length === 0) {
       spinner.stop();
@@ -193,16 +177,14 @@ export const startBackupProcess = async () => {
     }
 
     const tableDescriptions = await Promise.all(
-      tableNames.map((tableName) =>
-        db.describeTable({ TableName: tableName }).promise(),
-      ),
+      tableNames.map((tableName) => db("").Tables.describe(tableName).$()),
     );
 
     const sortedTables = tableDescriptions
       .map((desc) => ({
-        itemCount: desc.Table?.ItemCount || null,
-        tableName: desc.Table?.TableName || null,
-        tableSize: desc.Table?.TableSizeBytes || null,
+        itemCount: desc?.ItemCount || null,
+        tableName: desc?.TableName || null,
+        tableSize: desc?.TableSizeBytes || null,
       }))
       .sort((a, b) => (b.tableSize || 0) - (a.tableSize || 0));
 
@@ -224,7 +206,7 @@ export const startBackupProcess = async () => {
 
     spinner.stop();
 
-    const tablesFromArgs = argv.tables;
+    const tablesFromArgs = argv.tables as string | null;
 
     let tables: string[];
 
@@ -232,6 +214,11 @@ export const startBackupProcess = async () => {
       tables = sortedTables
         .map((t) => t.tableName)
         .filter((s) => s != null) as string[];
+    } else if (tablesFromArgs) {
+      const predefinedTables = tablesFromArgs.split(",");
+      tables = sortedTables
+        .map((t) => t.tableName)
+        .filter((s) => s != null && predefinedTables.includes(s)) as string[];
     } else {
       const tablesResponse: { tables: string[] } = await prompt([
         {
