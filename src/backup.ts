@@ -21,14 +21,14 @@ import { argv } from "yargs";
 import { BACKUP_PATH_PREFIX } from "./_constants";
 import { db } from "./_db";
 import Store from "./_store";
-import { millisecondsToStr } from "./_utils";
+import { millisecondsToStr, shuffledArray } from "./_utils";
 
 interface MaxLengths {
   itemCountLength: number;
   tableNameLength: number;
 }
 
-const MAX_TOTAL_SEGMENTS = 200;
+const MAX_TOTAL_SEGMENTS = 500;
 
 const backupSegment = async (
   dbInstance: Dynatron,
@@ -126,7 +126,7 @@ const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
   const dbInstance = db(tableName);
 
   await new PromisePool()
-    .for([...Array(totalSegments).keys()])
+    .for(shuffledArray([...Array(totalSegments).keys()]))
     .withConcurrency(20)
     .process(async (segment) => {
       const result = await backupSegment(

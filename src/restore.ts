@@ -16,7 +16,7 @@ import { argv } from "yargs";
 
 import { BACKUP_PATH_PREFIX } from "./_constants";
 import { db } from "./_db";
-import { findCommon, millisecondsToStr } from "./_utils";
+import { findCommon, millisecondsToStr, shuffledArray } from "./_utils";
 
 const convertWithPatterns = (
   str: string,
@@ -36,6 +36,7 @@ const restoreTable = async (
   namesSearchPattern: string | null,
   namesReplacePattern: string | null,
   task?: ListrTaskWrapper,
+  maxTableNameLength?: number,
 ) => {
   const path = `${BACKUP_PATH_PREFIX}/${extractionFolder}/${tableName}`;
 
@@ -62,8 +63,8 @@ const restoreTable = async (
       return;
     }
 
-    const dataFiles = readdirSync(`${path}/data`).filter(
-      (file) => extname(file) === ".json",
+    const dataFiles = shuffledArray(
+      readdirSync(`${path}/data`).filter((file) => extname(file) === ".json"),
     );
 
     let processedFiles = 0;
@@ -75,6 +76,11 @@ const restoreTable = async (
         const data = JSON.parse(
           readFileSync(`${path}/data/${dataFile}`, "utf8"),
         );
+
+        if (data.length === 0) {
+          processedFiles++;
+          return true;
+        }
 
         await db(dbTableName)
           .batchPut(data || [])
@@ -90,7 +96,7 @@ const restoreTable = async (
         );
 
         if (task != null) {
-          task.title = `${tableName.padEnd(100 || 0)} - ${
+          task.title = `${tableName.padEnd(maxTableNameLength || 0, " ")} - ${
             tableProgress >= 0.99995 && tableProgress <= 1 ? "~" : ""
           }${(tableProgress * 100).toFixed(2)}%`;
         }
@@ -277,6 +283,10 @@ export const startRestoreProcess = async () => {
 
     const start = Date.now();
 
+    const maxTableNameLength = tablesInArchive.reduce((p, c) => {
+      return p.length > c.length ? p : c;
+    }, "").length;
+
     console.clear();
 
     if (tablesInArchive.length > 0) {
@@ -293,13 +303,17 @@ export const startRestoreProcess = async () => {
                   archiveTablesSearchPattern,
                   dbTablesReplacePattern,
                   task,
+                  maxTableNameLength,
                 );
-                task.title = `${tableName.padEnd(100 || 0)} - Done`;
+                task.title = `${tableName.padEnd(
+                  maxTableNameLength,
+                  " ",
+                )} - Done`;
               },
             }),
           ),
         ],
-        { concurrent: 5 },
+        { concurrent: 10 },
       );
 
       await tasks.run();
