@@ -1,4 +1,5 @@
-#!/usr/bin/env node --max_old_space_size=4096
+#!/usr/bin/env node
+// #!/usr/bin/env node --max_old_space_size=4096
 // import v8 from "v8";
 
 import { configureActionAndEnv } from "./actions";
