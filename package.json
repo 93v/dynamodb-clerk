@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "lint": "eslint './src/**/*.{js,ts,tsx}'",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "test:watch": "jest --watchAll",
     "build": "tsc",
     "watch": "tsc -w",
@@ -38,9 +38,9 @@
   "homepage": "https://github.com/93v/dynamodb-clerk#readme",
   "husky": {
     "hooks": {
-      "pre-commit": "npm run lint && npm test",
+      "pre-commit": "npm run lint",
       "commit-msg": "commitlint -E HUSKY_GIT_PARAMS",
-      "pre-push": "npm run lint && npm test"
+      "pre-push": "npm run lint"
     }
   },
   "devDependencies": {
@@ -63,7 +63,7 @@
     "eslint-config-prettier": "^6.15.0",
     "eslint-plugin-prettier": "^3.1.4",
     "husky": "^4.3.0",
-    "jest": "^26.6.2",
+    "jest": "^26.6.3",
     "prettier": "^2.1.2",
     "sazerac": "^2.0.0",
     "semantic-release": "^17.2.2",

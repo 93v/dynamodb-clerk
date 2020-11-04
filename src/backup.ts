@@ -105,7 +105,7 @@ const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
   }
 
   const tableBackupPath = `${BACKUP_PATH_PREFIX}/${Store.get(
-    "profile",
+    "backupPathFolder",
   )}/${tableName}`;
 
   mkdirSync(tableBackupPath);
@@ -156,12 +156,9 @@ export const startBackupProcess = async () => {
     Store.set("profile", profile);
   }
 
-  if (profile == null) {
-    profile = new Date().toISOString();
-    Store.set("profile", profile);
-  }
-
-  const BACKUP_PATH = join(BACKUP_PATH_PREFIX, profile);
+  const BACKUP_PATH_FOLDER = profile || new Date().toISOString();
+  Store.set("backupPathFolder", BACKUP_PATH_FOLDER);
+  const BACKUP_PATH = join(BACKUP_PATH_PREFIX, BACKUP_PATH_FOLDER);
 
   const spinner = ora("Loading tables");
   const spinner2 = ora("Optimizing");
@@ -315,7 +312,7 @@ export const startBackupProcess = async () => {
         gzip: true,
         portable: true,
       },
-      [profile],
+      [BACKUP_PATH_FOLDER],
     );
     rmSync(BACKUP_PATH);
 

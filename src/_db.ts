@@ -17,7 +17,12 @@ export const db = (table: string) => {
   } else {
     clientConfigs = {
       mode: "direct",
-      profile: Store.get<string>("profile") as string,
+      ...(Store.get<string>("profile")
+        ? { profile: Store.get<string>("profile") as string }
+        : {
+            accessKeyId: Store.get<string>("accessKeyId") as string,
+            secretAccessKey: Store.get<string>("secretAccessKey") as string,
+          }),
       region: Store.get<string>("region") as string,
     };
   }
