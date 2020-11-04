@@ -79,10 +79,6 @@ export const intersection = <T>(a: T[], b: T[]) => {
   return a.filter((v) => s.has(v));
 };
 
-export const assertNever = (obj: never): never => {
-  throw new Error("Unexpected value: " + obj);
-};
-
 export const readSizeRecursive = (item: string): number => {
   const stats = lstatSync(item);
 
@@ -103,7 +99,7 @@ export const readSizeRecursive = (item: string): number => {
   }
 };
 
-const asyncSpawn = (
+export const asyncSpawn = (
   command: string,
   args?: ReadonlyArray<string>,
 ): Promise<string> =>

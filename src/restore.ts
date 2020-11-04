@@ -1,22 +1,26 @@
 import PromisePool from "@supercharge/promise-pool";
-// import {
-//   CreateTableInput,
-//   DescribeTableOutput,
-//   GlobalSecondaryIndex,
-//   LocalSecondaryIndex,
-// } from "aws-sdk/clients/dynamodb";
-import { readdirSync, readFileSync, statSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmdirSync,
+  statSync,
+} from "fs";
 import { prompt } from "inquirer";
 import Listr, { ListrTask, ListrTaskWrapper } from "listr";
 import ora from "ora";
 import { basename, extname, join } from "path";
-import { sync as rmSync } from "rimraf";
-import tar from "tar";
 import { argv } from "yargs";
 
 import { BACKUP_PATH_PREFIX } from "./_constants";
 import { db } from "./_db";
-import { findCommon, millisecondsToStr, shuffledArray } from "./_utils";
+import {
+  asyncSpawn,
+  findCommon,
+  millisecondsToStr,
+  shuffledArray,
+} from "./_utils";
 
 const convertWithPatterns = (
   str: string,
@@ -41,11 +45,7 @@ const restoreTable = async (
   const path = `${BACKUP_PATH_PREFIX}/${extractionFolder}/${tableName}`;
 
   try {
-    const tableDescription = JSON.parse(
-      readFileSync(`${path}/description.json`, "utf8"),
-    );
-
-    const table = tableDescription;
+    const table = JSON.parse(readFileSync(`${path}/description.json`, "utf8"));
 
     if (table == null) {
       return;
@@ -79,7 +79,7 @@ const restoreTable = async (
 
         if (data.length === 0) {
           processedFiles++;
-          return true;
+          return null;
         }
 
         await db(dbTableName)
@@ -148,28 +148,26 @@ export const startRestoreProcess = async () => {
 
   const spinner = ora("Decompressing the archive").start();
 
-  try {
-    await tar.x({
-      C: BACKUP_PATH_PREFIX,
-      file: join(BACKUP_PATH_PREFIX, archive),
-    });
+  console.log("");
+  console.log(archive);
+  console.log(join(BACKUP_PATH_PREFIX, archive));
+  console.log(basename(archive, extname(archive)));
 
-    const filesInArchive = await new Promise((resolve) => {
-      tar.t({
-        C: BACKUP_PATH_PREFIX,
-        file: join(BACKUP_PATH_PREFIX, archive || ""),
-        noResume: true,
-        onentry: (entry) => {
-          resolve(entry);
-        },
-      });
-    });
+  const extractionFolder = join(basename(archive, extname(archive)));
+
+  if (!existsSync(`${BACKUP_PATH_PREFIX}/${extractionFolder}`)) {
+    mkdirSync(`${BACKUP_PATH_PREFIX}/${extractionFolder}`);
+  }
+
+  try {
+    await asyncSpawn("tar", [
+      "-xzf",
+      join(BACKUP_PATH_PREFIX, archive),
+      "-C",
+      `${BACKUP_PATH_PREFIX}/${extractionFolder}`,
+    ]);
 
     const dbTables = await db("").Tables.list().$();
-
-    const extractionFolder: string = (
-      (filesInArchive as any).path || ""
-    ).replace("/", "");
 
     const tablesInArchive = readdirSync(
       `${BACKUP_PATH_PREFIX}/${extractionFolder}`,
@@ -319,7 +317,9 @@ export const startRestoreProcess = async () => {
       await tasks.run();
     }
 
-    rmSync(`${BACKUP_PATH_PREFIX}/${extractionFolder}`);
+    rmdirSync(`${BACKUP_PATH_PREFIX}/${extractionFolder}`, {
+      recursive: true,
+    });
 
     console.log(`Elapsed Time: ${millisecondsToStr(Date.now() - start)}`);
   } catch (error) {

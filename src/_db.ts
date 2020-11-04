@@ -3,7 +3,7 @@ import { DBCActionEnv } from "../types/action";
 import Store from "./_store";
 
 export const db = (table: string) => {
-  let clientConfigs: DynatronDocumentClientParams | null = null;
+  let clientConfigs: DynatronDocumentClientParams | null;
 
   const env = Store.get<DBCActionEnv>("env");
 

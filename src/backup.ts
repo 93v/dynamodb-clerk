@@ -7,6 +7,7 @@ import {
   lstatSync,
   mkdirSync,
   readdirSync,
+  rmdirSync,
   writeFileSync,
 } from "fs";
 import { prompt } from "inquirer";
@@ -14,14 +15,12 @@ import Listr, { ListrTask, ListrTaskWrapper } from "listr";
 import ora from "ora";
 import { join } from "path";
 import prettyBytes from "pretty-bytes";
-import { sync as rmSync } from "rimraf";
-import tar from "tar";
 import { argv } from "yargs";
 
 import { BACKUP_PATH_PREFIX } from "./_constants";
 import { db } from "./_db";
 import Store from "./_store";
-import { millisecondsToStr, shuffledArray } from "./_utils";
+import { asyncSpawn, millisecondsToStr, shuffledArray } from "./_utils";
 
 interface MaxLengths {
   itemCountLength: number;
@@ -129,7 +128,7 @@ const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
     .for(shuffledArray([...Array(totalSegments).keys()]))
     .withConcurrency(20)
     .process(async (segment) => {
-      const result = await backupSegment(
+      return backupSegment(
         dbInstance,
         tableName,
         tableDescription,
@@ -139,8 +138,6 @@ const backupTable = async (tableName: string, task?: ListrTaskWrapper) => {
         segmentProgresses,
         task,
       );
-
-      return result;
     });
 };
 
@@ -274,7 +271,7 @@ export const startBackupProcess = async () => {
 
     const start = Date.now();
 
-    rmSync(BACKUP_PATH);
+    rmdirSync(BACKUP_PATH, { recursive: true });
     mkdirSync(BACKUP_PATH);
 
     console.clear();
@@ -305,16 +302,15 @@ export const startBackupProcess = async () => {
 
     spinner2.start();
 
-    await tar.c(
-      {
-        C: BACKUP_PATH_PREFIX,
-        file: `${BACKUP_PATH}.tgz`,
-        gzip: true,
-        portable: true,
-      },
-      [BACKUP_PATH_FOLDER],
-    );
-    rmSync(BACKUP_PATH);
+    await asyncSpawn("tar", [
+      "-czf",
+      `${BACKUP_PATH}.tgz`,
+      "-C",
+      join(BACKUP_PATH_PREFIX, BACKUP_PATH_FOLDER),
+      "./",
+    ]);
+
+    rmdirSync(BACKUP_PATH, { recursive: true });
 
     spinner2.stop();
 

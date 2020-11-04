@@ -1,16 +1,9 @@
-import { Options } from "async-retry";
-
 export enum ActionOptions {
   "Backup From Remote" = "backup-from-remote",
   "Backup From Local" = "backup-from-local",
   "Restore To Local" = "restore-to-local",
   "Restore To Remote" = "restore-to-remote",
 }
-
-export const RETRY_OPTIONS: Options = {
-  minTimeout: 50,
-  retries: 10,
-};
 
 export const BACKUP_PATH_PREFIX = `./backup-data`;
 
