@@ -82,6 +82,6 @@
     "ora": "^5.1.0",
     "pretty-bytes": "^5.4.1",
     "properties-reader": "^2.1.1",
-    "yargs": "^16.1.0"
+    "yargs": "^16.1.1"
   }
 }
