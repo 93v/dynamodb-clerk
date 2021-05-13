@@ -45,7 +45,7 @@
   },
   "devDependencies": {
     "@commitlint/cli": "^11.0.0",
-    "@commitlint/config-conventional": "^11.0.0",
+    "@commitlint/config-conventional": "^12.1.4",
     "@types/async-retry": "^1.4.2",
     "@types/aws-sdk": "^2.7.0",
     "@types/inquirer": "^7.3.1",
